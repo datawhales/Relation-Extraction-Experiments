@@ -4,6 +4,6 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 	--max_length 100 \
 	--mode CM \
 	--dataset wiki80 \
-    --ckpt_to_load ckpt_exp/all_markers_concat/2nd_ckpt_of_step_60000 \
+    --ckpt_to_load ckpt_exp/all_markers_concat/ckpt_of_step_60000 \
 	--output_representation all_markers_concat \
 	--train_prop 1 \
