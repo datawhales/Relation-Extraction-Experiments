@@ -80,15 +80,15 @@ class REModel(nn.Module):
             state = torch.max(state, dim=2)[0]
         elif self.args.output_representation == "all_markers_concat":
             indice = torch.arange(input_ids.size()[0])    # batch size
-            h_start_state = m_last_hidden_state[indice, h_pos]
-            h_end_state = m_last_hidden_state[indice, h_end]
-            t_start_state = m_last_hidden_state[indice, t_pos]
-            t_end_state = m_last_hidden_state[indice, t_end]
+            h_start_state = last_hidden_states[indice, h_pos]
+            h_end_state = last_hidden_states[indice, h_end]
+            t_start_state = last_hidden_states[indice, t_pos]
+            t_end_state = last_hidden_states[indice, t_end]
             state = torch.cat([h_start_state, h_end_state, t_start_state, t_end_state], 1)
         elif self.args.output_representation == "end_to_first_concat":
             indice = torch.arange(input_ids.size()[0])    # batch size
-            h_end_state = m_last_hidden_state[indice, h_end]
-            t_start_state = m_last_hidden_state[indice, t_pos]
+            h_end_state = last_hidden_states[indice, h_end]
+            t_start_state = last_hidden_states[indice, t_pos]
             state = torch.cat([h_end_state, t_start_state], 1)    
         else:  # [CLS]
             state = last_hidden_states[:, 0, :]   # [batch size, hidden size]
