@@ -139,7 +139,10 @@ class CP(nn.Module):
             h_end_state = m_last_hidden_state[indice, h_end]
             t_start_state = m_last_hidden_state[indice, t_pos]
             state = torch.cat([h_end_state, t_start_state], 1)
-
+        elif self.args.output_representation == "marker_minus":
+            h_state = m_last_hidden_state[indice, h_pos]
+            t_state = m_last_hidden_state[indice, t_pos]
+            state = t_state - h_state
         else:   # CLS
             state = m_last_hidden_state[:, 0, :]
 

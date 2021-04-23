@@ -186,7 +186,7 @@ if __name__ == "__main__":
                         default="", help="ckpt dir to save")
     #### revised
     parser.add_argument("--output_representation", dest="output_representation", type=str,
-                        default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat}")
+                        default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat, marker_minus}")
     #### revised
 
     parser.add_argument("--seed", dest="seed", type=int,
