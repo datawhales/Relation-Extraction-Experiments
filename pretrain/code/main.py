@@ -1,4 +1,3 @@
-
 import os
 import json
 import torch
@@ -52,14 +51,36 @@ def train(args, model, train_dataset):
     params = {"batch_size": args.batch_size_per_gpu, "sampler": train_sampler}
     train_dataloader = data.DataLoader(train_dataset, **params)
 
-    # optimizer
-    no_decay = ['bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr, eps=args.adam_epsilon, correct_bias=False)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=step_tot)
+    # # optimizer
+    # no_decay = ['bias', 'LayerNorm.weight']
+    # optimizer_grouped_parameters = [
+    #     {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+    #     {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    #     ]
+    # optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr, eps=args.adam_epsilon, correct_bias=False)
+    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=step_tot)
+
+    if args.model == "MTB" or args.model == "CP":
+        # optimizer
+        no_decay = ['bias', 'LayerNorm.weight']
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+            {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+            ]
+        optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr, eps=args.adam_epsilon, correct_bias=False)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=step_tot)
+    elif args.model == "TS":
+        for name, param in model.named_parameters():
+            if 'teacher_model' in name:
+                param.requires_grad = False
+        # optimizer
+        no_decay = ['bias', 'LayerNorm.weight']
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+            {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+            ]
+        optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr, eps=args.adam_epsilon, correct_bias=False)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=step_tot)
 
     # amp training
     # model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
@@ -88,7 +109,7 @@ def train(args, model, train_dataset):
                             "label": batch[8].to(args.device), "l_eh": batch[9].to(args.device),
                             "l_et": batch[10].to(args.device), "r_eh": batch[11].to(args.device),
                             "r_et": batch[12].to(args.device)}
-            elif args.model == "CP":
+            elif args.model == "CP" or args.model == "TS":
                 inputs = {"input": batch[0].to(args.device), "mask": batch[1].to(args.device),
                         "label": batch[2].to(args.device), "h_pos": batch[3].to(args.device),
                         't_pos': batch[4].to(args.device), "h_end": batch[5].to(args.device),
@@ -104,7 +125,11 @@ def train(args, model, train_dataset):
             # with amp.scale_loss(loss, optimizer) as scaled_loss:
             #     scaled_loss.backward()
             ########################
-            loss.sum().backward()
+            # loss.sum().backward()
+            if args.model == "MTB" or args.model == "CP":
+                loss.sum().backward()
+            elif args.model == "TS":
+                loss.backward()
             #########################
             
             if step % args.gradient_accumulation_steps == 0:
@@ -119,9 +144,18 @@ def train(args, model, train_dataset):
                         os.mkdir("../ckpt")
                     if not os.path.exists("../ckpt/"+args.save_dir):
                         os.mkdir("../ckpt/"+args.save_dir)
-                    ckpt = {
-                        'bert-base': model.module.model.bert.state_dict(),
-                    }
+                    
+                    # ckpt = {
+                    #     'bert-base': model.module.model.bert.state_dict(),
+                    # }
+                    if args.model == "MTB" or args.model == "CP":
+                        ckpt = {
+                            'bert-base': model.module.model.bert.state_dict(),
+                        }
+                    elif args.model == "TS":
+                        ckpt = {
+                            'bert-base': model.student_model.bert.state_dict(),
+                        }
                     torch.save(ckpt, os.path.join("../ckpt/"+args.save_dir, "ckpt_of_step_"+str(global_step)))
 
                 # if args.local_rank in [0, -1] and global_step % 5 == 0:
@@ -131,9 +165,20 @@ def train(args, model, train_dataset):
                 # if args.local_rank in [0, -1] and global_step % 500 == 0:
                 #     log_loss(step_record, loss_record)
                 
-                if args.local_rank in [0, -1]:
-                    sys.stdout.write("step: %d, schedule: %.3f, mlm_loss: %.6f relation_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
-                    sys.stdout.flush()
+
+
+                # if args.local_rank in [0, -1]:
+                #     sys.stdout.write("step: %d, schedule: %.3f, mlm_loss: %.6f relation_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
+                #     sys.stdout.flush()
+                if args.model == "MTB" or args.model == "CP":
+                    if args.local_rank in [0, -1]:
+                        sys.stdout.write("step: %d, schedule: %.3f, mlm_loss: %.6f relation_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
+                        sys.stdout.flush()
+                elif args.model == "TS":
+                    if args.local_rank in [0, -1]:
+                        sys.stdout.write("step: %d, schedule: %.3f, teacher_student_loss: %.6f student_student_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
+                        sys.stdout.flush()
+                        
         
         if args.train_sample:
             print("sampling...")
@@ -159,7 +204,7 @@ if __name__ == "__main__":
                         default=0.3, help="true entity(not `BLANK`) proportion")
 
     parser.add_argument("--model", dest="model", type=str,
-                        default="", help="{MTB, CP}")
+                        default="", help="{MTB, CP, TS}")
     parser.add_argument("--train_sample",action="store_true",
                         help="dynamic sample or not")
     parser.add_argument("--max_length", dest="max_length", type=int,
@@ -189,6 +234,8 @@ if __name__ == "__main__":
                         default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat, marker_minus}")
     #### revised
 
+    parser.add_argument("--teacher_model", dest="teacher_model", type=str,
+                        default="../ckpt/ckpt_exp/end_to_first_concat/ckpt_of_step_60000", help="teacher model path")
     parser.add_argument("--seed", dest="seed", type=int,
                         default=42, help="seed for network")
 
@@ -229,8 +276,11 @@ if __name__ == "__main__":
     elif args.model == "CP":
         model = CP(args).to(args.device)
         train_dataset = CPDataset("../data/CP", args)
+    elif args.model == "TS":
+        model = TS(args).to(args.device)
+        train_dataset = CPDataset("../data/CP", args)
     else:
-        raise Exception("No such model! Please make sure that `model` takes the value in {MTB, CP}")
+        raise Exception("No such model! Please make sure that `model` takes the value in {MTB, CP, TS}")
 
     # Barrier to make sure all process train the model simultaneously.
     if args.local_rank != -1:

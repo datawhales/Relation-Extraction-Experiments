@@ -52,6 +52,96 @@ def mask_tokens(inputs, tokenizer, not_mask_pos=None):
 
     return inputs.cuda(), labels.cuda()
 
+class TS(nn.Module):
+    """ Teacher-Student model.
+
+    This class implements 'TS' model based on model 'BertForMaskedLM' and 'CP'.
+    Uses MSELoss.
+
+    Attributes:
+        teacher_model: Model used as a teacher model.
+        student_model: Model to train.
+        tokenizer: Tokenizer.
+        mseloss: MSELoss.
+        args: args from command line.
+    """
+    def __init__(self, args):
+        super().__init__()
+        teacher_model_ckpt = torch.load(args.teacher_model)
+        self.teacher_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+        model_dict = self.teacher_model.state_dict()
+        pretrained_dict = {k: v for k, v in teacher_model_ckpt['bert-base'].items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        self.teacher_model.load_state_dict(model_dict)
+
+        self.student_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.mseloss = nn.MSELoss()
+        self.args = args
+
+    def forward(self, input, mask, label, h_pos, t_pos, h_end, t_end):
+        input = input.view(-1, self.args.max_length)     # [batch size, max len * 2] -> [batch size * 2, max len]
+        mask = mask.view(-1, self.args.max_length)
+        label = label.view(-1)     # [batch size * 2]
+        h_pos = h_pos.view(-1)
+        t_pos = t_pos.view(-1)
+        h_end = h_end.view(-1)
+        t_end = t_end.view(-1)
+
+        indice = torch.arange(0, input.size()[0])
+        not_mask_pos = torch.zeros((input.size()[0], input.size()[1]), dtype=int)
+        not_mask_pos[indice, h_pos] = 1
+        not_mask_pos[indice, t_pos] = 1
+        not_mask_pos[indice, h_end] = 1
+        not_mask_pos[indice, t_end] = 1
+
+        m_input, m_labels = mask_tokens(input.cpu(), self.tokenizer, not_mask_pos=not_mask_pos)
+        teacher_outputs = self.teacher_model(input_ids=m_input, labels=m_labels, attention_mask=mask, output_hidden_states=True)
+        student_outputs = self.student_model(input_ids=m_input, labels=m_labels, attention_mask=mask, output_hidden_states=True)
+        
+        teacher_loss = teacher_outputs.loss
+        teacher_logits = teacher_outputs.logits
+        teacher_last_hidden_state = teacher_outputs.hidden_states[-1]
+        student_loss = student_outputs.loss
+        student_logits = student_outputs.logits
+        student_last_hidden_state = student_outputs.hidden_states[-1]
+
+        teacher_h_start_state = teacher_last_hidden_state[indice, h_pos]
+        teacher_h_end_state = teacher_last_hidden_state[indice, h_end]
+        teacher_t_start_state = teacher_last_hidden_state[indice, t_pos]
+        teacher_t_end_state = teacher_last_hidden_state[indice, t_end]
+        
+        student_h_start_state = student_last_hidden_state[indice, h_pos]
+        student_h_end_state = student_last_hidden_state[indice, h_end]
+        student_t_start_state = student_last_hidden_state[indice, t_pos]
+        student_t_end_state = student_last_hidden_state[indice, t_end]
+
+        if self.args.output_representation == "entity_marker":
+            teacher_state = torch.cat([teacher_h_start_state, teacher_t_start_state], 1)
+            student_state = torch.cat([student_h_start_state, student_t_start_state], 1)
+
+            teacher_state = teacher_state.view(-1, self.args.hidden_size * 4)         # [batch size, hidden size * 4]
+            teacher_state = teacher_state[:, 0:self.args.hidden_size * 2]              # [batch size, hidden size * 2]
+            student_state = student_state.view(-1, self.args.hidden_size * 4)
+            student_state_1 = student_state[:, 0:self.args.hidden_size * 2]
+            student_state_2 = student_state[:, self.args.hidden_size * 2:]
+            
+        elif self.args.output_representation == "end_to_first_concat":
+            teacher_state = torch.cat([teacher_h_end_state, teacher_t_start_state], 1)          # [batch size * 2, hidden_size * 2]
+            student_state = torch.cat([student_h_end_state, student_t_start_state], 1)          # [batch size * 2, hidden_size * 2]
+
+            teacher_state = teacher_state.view(-1, self.args.hidden_size * 4)         # [batch size, hidden size * 4]
+            teacher_state = teacher_state[:, 0:self.args.hidden_size * 2]              # [batch size, hidden size * 2]
+            student_state = student_state.view(-1, self.args.hidden_size * 4)
+            student_state_1 = student_state[:, 0:self.args.hidden_size * 2]
+            student_state_2 = student_state[:, self.args.hidden_size * 2:]
+
+        t_s_loss = self.mseloss(teacher_state, student_state_1)
+        s_s_loss = self.mseloss(student_state_1, student_state_2)
+
+        # return student_loss, t_s_loss + s_s_loss
+        return t_s_loss, s_s_loss
+
 class CP(nn.Module):
     """ Contrastive Pre-training model.
 
@@ -107,15 +197,14 @@ class CP(nn.Module):
         # t_state = m_last_hidden_state[indice, t_pos]
         # state = torch.cat((h_state, t_state), 1)
 
+        h_start_state = m_last_hidden_state[indice, h_pos]
+        h_end_state = m_last_hidden_state[indice, h_end]
+        t_start_state = m_last_hidden_state[indice, t_pos]
+        t_end_state = m_last_hidden_state[indice, t_end]
+
         if self.args.output_representation == "entity_marker":
-            h_state = m_last_hidden_state[indice, h_pos]
-            t_state = m_last_hidden_state[indice, t_pos]
-            state = torch.cat((h_state, t_state), 1)
+            state = torch.cat((h_start_state, t_start_state), 1)
         elif self.args.output_representation == "all_markers":
-            h_start_state = m_last_hidden_state[indice, h_pos]
-            h_end_state = m_last_hidden_state[indice, h_end]
-            t_start_state = m_last_hidden_state[indice, t_pos]
-            t_end_state = m_last_hidden_state[indice, t_end]
             h_start_state = h_start_state.unsqueeze(2)
             h_end_state = h_end_state.unsqueeze(2)
             t_start_state = t_start_state.unsqueeze(2)
@@ -123,26 +212,16 @@ class CP(nn.Module):
             state = torch.cat([h_start_state, h_end_state, t_start_state, t_end_state], 2)
             state = torch.max(state, dim=2)[0]
         elif self.args.output_representation == "end_to_first":
-            h_end_state = m_last_hidden_state[indice, h_end]
-            t_start_state = m_last_hidden_state[indice, t_pos]
             h_end_state = h_end_state.unsqueeze(2)
             t_start_state = t_start_state.unsqueeze(2)
             state = torch.cat([h_end_state, t_start_state], 2)
             state = torch.max(state, dim=2)[0]
         elif self.args.output_representation == "all_markers_concat":
-            h_start_state = m_last_hidden_state[indice, h_pos]
-            h_end_state = m_last_hidden_state[indice, h_end]
-            t_start_state = m_last_hidden_state[indice, t_pos]
-            t_end_state = m_last_hidden_state[indice, t_end]
             state = torch.cat([h_start_state, h_end_state, t_start_state, t_end_state], 1)
         elif self.args.output_representation == "end_to_first_concat":
-            h_end_state = m_last_hidden_state[indice, h_end]
-            t_start_state = m_last_hidden_state[indice, t_pos]
             state = torch.cat([h_end_state, t_start_state], 1)
         elif self.args.output_representation == "marker_minus":
-            h_state = m_last_hidden_state[indice, h_pos]
-            t_state = m_last_hidden_state[indice, t_pos]
-            state = t_state - h_state
+            state = t_start_state - h_start_state
         else:   # CLS
             state = m_last_hidden_state[:, 0, :]
 
