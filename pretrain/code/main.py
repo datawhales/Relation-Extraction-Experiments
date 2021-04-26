@@ -154,7 +154,7 @@ def train(args, model, train_dataset):
                         }
                     elif args.model == "TS":
                         ckpt = {
-                            'bert-base': model.student_model.bert.state_dict(),
+                            'bert-base': model.module.student_model.bert.state_dict(),
                         }
                     torch.save(ckpt, os.path.join("../ckpt/"+args.save_dir, "ckpt_of_step_"+str(global_step)))
 
