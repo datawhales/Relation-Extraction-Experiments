@@ -28,6 +28,19 @@ class EntityMarker:
         self.err = 0
         self.args = args
 
+    def basic_tokenize(self, raw_text):
+        """ basic tokenizer.
+        """
+        tokens = []
+        for token in raw_text:
+            token = token.lower()
+            tokens.append(token)
+
+        text = " ".join(tokens)
+        encoded_text = self.tokenizer.encode(text)[1:-1]
+        # print(tokenizer.decode(encoded_text))
+        return encoded_text
+
     def tokenize(self, raw_text, h_pos_range, t_pos_range, h_type=None, t_type=None, h_blank=False, t_blank=False):
         """ Tokenizer for 'CM', 'CT' settings.
 

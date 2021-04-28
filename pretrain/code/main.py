@@ -118,7 +118,7 @@ def train(args, model, train_dataset):
                 inputs = {"input": batch[0].to(args.device), "mask": batch[1].to(args.device),
                         "label": batch[2].to(args.device), "h_pos": batch[3].to(args.device),
                         't_pos': batch[4].to(args.device), "h_end": batch[5].to(args.device),
-                        "t_end": batch[6].to(args.device), "raw_text": batch[7].to(args.device)}
+                        "t_end": batch[6].to(args.device), "raw_text_id": batch[7].to(args.device)}
 
             model.train()
             m_loss, r_loss = model(**inputs)

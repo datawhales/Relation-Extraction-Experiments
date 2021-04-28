@@ -81,12 +81,14 @@ class TS_CP_SBERT(nn.Module):
         self.mseloss = nn.MSELoss()
         self.args = args
 
-    def forward(self, input, mask, label, h_pos, t_pos, h_end, t_end, raw_text):
+    def forward(self, input, mask, label, h_pos, t_pos, h_end, t_end, raw_text_id):
         # input shape = [batch size, max len]
         entity_marker_text = []
+        raw_text = []
         batch_size = input.size()[0]
         for i in range(batch_size):
             entity_marker_text.append(self.tokenizer.decode(input[i]))
+            raw_text.append(self.tokenizer.decode(raw_text_id[i]))
 
         indice = torch.arange(0, batch_size)
         not_mask_pos = torch.zeros((input.size()[0], input.size()[1]), dtype=int)

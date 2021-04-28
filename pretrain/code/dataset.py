@@ -50,7 +50,7 @@ class CP_SBERT_Dataset(data.Dataset):
         self.h_end = np.zeros((len(data)), dtype=int)
         self.t_end = np.zeros((len(data)), dtype=int)
 
-        self.raw_text = []   # all raw texts go into sbert
+        self.raw_text_tokens = np.zeros((len(data), args.max_length), dtype=int)
 
         for i, rel in enumerate(rel2scope.keys()):
             scope = rel2scope[rel]
@@ -64,6 +64,7 @@ class CP_SBERT_Dataset(data.Dataset):
             t_p = sentence["t"]["pos"][0]
 
             ids, ph, pt, eh, et = entityMarker.tokenize(sentence["tokens"], [h_p[0], h_p[-1]+1], [t_p[0], t_p[-1]+1], None, None, h_flag, t_flag)
+            raw_text_ids = entityMarker.basic_tokenize(sentence["tokens"])
 
             length = min(len(ids), args.max_length)
             self.tokens[i][:length] = ids[:length]
@@ -73,48 +74,41 @@ class CP_SBERT_Dataset(data.Dataset):
             self.h_end[i] = min(args.max_length-1, eh)
             self.t_end[i] = min(args.max_length-1, et)
 
-        
-            # raw text
-            raw_text = sentence["tokens"]
-            for i, token in enumerate(raw_text):
-                token = token.lower()
-                raw_text[i] = token
-
-            self.raw_text.append(' '.join(raw_text))
+            self.raw_text_tokens[i][:length] = raw_text_ids[:length]
 
 
-        def __len__(self):
-            """ Number of instances in an epoch.
-            """
-            return len(self.raw_text)
+    def __len__(self):
+        """ Number of instances in an epoch.
+        """
+        return len(self.label)
 
-        def __getitem__(self, index):
-            """ Get training instance.
+    def __getitem__(self, index):
+        """ Get training instance.
 
-            Args:
-                index: Instance index.
+        Args:
+            index: Instance index.
 
-            Returns:
-                input: Tokenized word id.
-                mask: Attention mask for bert. 0 means masking, 1 means not masking.
-                label: Label for sentence.
-                h_pos: Position of head entity start.
-                t_pos: Position of tail entity start.
-                h_end: Position of head entity end.
-                t_end: Position of tail entity end.
-                raw_text: Raw text.
-            """
-            input = self.tokens[index]
-            mask = self.mask[index]
-            label = self.label[index]
-            h_pos = self.h_pos[index]
-            t_pos = self.t_pos[index]
-            h_end = self.h_end[index]
-            t_end = self.t_end[index]
+        Returns:
+            input: Tokenized word id.
+            mask: Attention mask for bert. 0 means masking, 1 means not masking.
+            label: Label for sentence.
+            h_pos: Position of head entity start.
+            t_pos: Position of tail entity start.
+            h_end: Position of head entity end.
+            t_end: Position of tail entity end.
+            raw_text_id: Raw text token ids.
+        """
+        input = self.tokens[index]
+        mask = self.mask[index]
+        label = self.label[index]
+        h_pos = self.h_pos[index]
+        t_pos = self.t_pos[index]
+        h_end = self.h_end[index]
+        t_end = self.t_end[index]
 
-            raw_text = self.raw_text[index]
+        raw_text_id = self.raw_text_tokens[index]
 
-            return input, mask, label, h_pos, t_pos, h_end, t_end, raw_text
+        return input, mask, label, h_pos, t_pos, h_end, t_end, raw_text_id
 
 class CPDataset(data.Dataset):
     """Overwritten class Dataset for model CP.
