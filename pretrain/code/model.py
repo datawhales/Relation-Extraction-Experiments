@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from pytorch_metric_learning.losses import NTXentLoss
 from transformers import BertForMaskedLM, BertForPreTraining, BertTokenizer
+from sentence_transformers import SentenceTransformer
 
 def mask_tokens(inputs, tokenizer, not_mask_pos=None):
     """ Prepare masked tokens of inputs and labels for masked language modeling (80% MASK, 10% random, 10% original).
@@ -51,6 +52,82 @@ def mask_tokens(inputs, tokenizer, not_mask_pos=None):
     inputs[indices_random] = random_words[indices_random]
 
     return inputs.cuda(), labels.cuda()
+
+class TS_CP_SBERT(nn.Module):
+    """ Teacher-Student model between CP model and SBERT model.
+    Uses MSELoss.
+
+    Attributes:
+        teacher_model: Model used as a teacher model.
+        student_model: Model to train.
+        tokenizer: Tokenizer.
+        mseloss: MSELoss.
+        args: args from command line.
+    """
+    def __init__(self, args):
+        super().__init__()
+        # teacher model
+        teacher_model_ckpt = torch.load(args.teacher_model)
+        self.teacher_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+        model_dict = self.teacher_model.state_dict()
+        pretrained_dict = {k: v for k, v in teacher_model_ckpt['bert-base'].items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        self.teacher_model.load_state_dict(model_dict)
+
+        # student model
+        self.student_model = SentenceTransformer('bert-base-nli-mean-tokens')
+
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.mseloss = nn.MSELoss()
+        self.args = args
+
+    def forward(self, input, mask, label, h_pos, t_pos, h_end, t_end, raw_text):
+        # input shape = [batch size, max len]
+        entity_marker_text = []
+        batch_size = input.size()[0]
+        for i in range(batch_size):
+            entity_marker_text.append(self.tokenizer.decode(input[i]))
+
+        indice = torch.arange(0, batch_size)
+        not_mask_pos = torch.zeros((input.size()[0], input.size()[1]), dtype=int)
+        not_mask_pos[indice, h_pos] = 1
+        not_mask_pos[indice, t_pos] = 1
+        not_mask_pos[indice, h_end] = 1
+        not_mask_pos[indice, t_end] = 1
+
+        m_input, m_labels = mask_tokens(input.cpu(), self.tokenizer, not_mask_pos=not_mask_pos)
+        teacher_outputs = self.teacher_model(input_ids=m_input, labels=m_labels, attention_mask=mask, output_hidden_states=True)
+        student_outputs_raw_text = self.student_model.encode(raw_text, convert_to_tensor=True)   # [batch size, hidden size]
+        student_outputs_entity_marker_text = self.student_model.encode(entity_marker_text, convert_to_tensor=True)   # [batch size, hidden size]
+
+        student_state_1 = student_outputs_raw_text
+        student_state_2 = student_outputs_entity_marker_text
+
+        teacher_loss = teacher_outputs.loss
+        teacher_logits = teacher_outputs.logits
+        teacher_last_hidden_state = teacher_outputs.hidden_states[-1]
+        
+        teacher_h_start_state = teacher_last_hidden_state[indice, h_pos]      # [batch size, hidden size]
+        teacher_h_end_state = teacher_last_hidden_state[indice, h_end]
+        teacher_t_start_state = teacher_last_hidden_state[indice, t_pos]
+        teacher_t_end_state = teacher_last_hidden_state[indice, t_end]
+
+        teacher_state = torch.cat([teacher_h_start_state, teacher_t_start_state], 1)      # [batch size, hidden size * 2]
+
+        if self.args.pooling_method == "mean":
+            teacher_state = teacher_state.view(-1, 2)  # [batch size * hidden size, 2]
+            teacher_state = teacher_state.mean(dim=1).view(batch_size, -1)    # [batch size, hidden size]
+        elif self.args.pooling_method == "max":
+            teacher_state = teacher_state.view(-1, 2)   # [batch size * hidden size, 2]
+            teacher_state = torch.max(teacher_state, dim=1)[0].view(batch_size, -1)   # [batch size, hidden size]
+        elif self.args.pooling_method == "min":
+            teacher_state = teacher_state.view(-1, 2)   # [batch size * hidden size, 2]
+            teacher_state = torch.min(teacher_state, dim=1)[0].view(batch_size, -1)   # [batch size, hidden size]
+
+        t_s_loss = self.mseloss(teacher_state, student_state_1)
+        s_s_loss = self.mseloss(student_state_1, student_state_2)
+
+        return t_s_loss, s_s_loss
 
 class TS(nn.Module):
     """ Teacher-Student model.

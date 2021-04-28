@@ -14,6 +14,107 @@ from torch.utils import data
 sys.path.append("../../")
 from utils.utils import EntityMarker
 
+class CP_SBERT_Dataset(data.Dataset):
+    """ Dataset for teacher-student model which uses CP as teacher model
+        and SBERT as student model.  
+    """
+    def __init__(self, path, args):
+        """ Inits tokenized sentence and pair of text with entity markers and raw text.
+
+        Args:
+            path: path to your dataset.
+            args: args from command line.
+
+        Returns:
+            No returns.
+        
+        Raises:
+            If the dataset in `path` is not the same format as described in
+            file 'prepare_data.py', there may raise:
+                - `key not found`
+                - `integer can't be indexed`
+                and so on.
+        """
+        self.path = path
+        self.args = args
+        # use same data with cp model
+        data = json.load(open(os.path.join(path, "cpdata.json")))
+        rel2scope = json.load(open(os.path.join(path, "rel2scope.json")))
+        entityMarker = EntityMarker()
+
+        self.tokens = np.zeros((len(data), args.max_length), dtype=int)
+        self.mask = np.zeros((len(data), args.max_length), dtype=int)
+        self.label = np.zeros((len(data)), dtype=int)
+        self.h_pos = np.zeros((len(data)), dtype=int)
+        self.t_pos = np.zeros((len(data)), dtype=int)
+        self.h_end = np.zeros((len(data)), dtype=int)
+        self.t_end = np.zeros((len(data)), dtype=int)
+
+        self.raw_text = []   # all raw texts go into sbert
+
+        for i, rel in enumerate(rel2scope.keys()):
+            scope = rel2scope[rel]
+            for j in range(scope[0], scope[1]):
+                self.label[j] = i
+
+        for i, sentence in enumerate(data):
+            h_flag = random.random() > args.alpha
+            t_flag = random.random() > args.alpha
+            h_p = sentence["h"]["pos"][0] 
+            t_p = sentence["t"]["pos"][0]
+
+            ids, ph, pt, eh, et = entityMarker.tokenize(sentence["tokens"], [h_p[0], h_p[-1]+1], [t_p[0], t_p[-1]+1], None, None, h_flag, t_flag)
+
+            length = min(len(ids), args.max_length)
+            self.tokens[i][:length] = ids[:length]
+            self.mask[i][:length] = 1
+            self.h_pos[i] = min(args.max_length-1, ph) 
+            self.t_pos[i] = min(args.max_length-1, pt)
+            self.h_end[i] = min(args.max_length-1, eh)
+            self.t_end[i] = min(args.max_length-1, et)
+
+        
+            # raw text
+            raw_text = sentence["tokens"]
+            for i, token in enumerate(raw_text):
+                token = token.lower()
+                raw_text[i] = token
+
+            self.raw_text.append(' '.join(raw_text))
+
+
+        def __len__(self):
+            """ Number of instances in an epoch.
+            """
+            return len(self.raw_text)
+
+        def __getitem__(self, index):
+            """ Get training instance.
+
+            Args:
+                index: Instance index.
+
+            Returns:
+                input: Tokenized word id.
+                mask: Attention mask for bert. 0 means masking, 1 means not masking.
+                label: Label for sentence.
+                h_pos: Position of head entity start.
+                t_pos: Position of tail entity start.
+                h_end: Position of head entity end.
+                t_end: Position of tail entity end.
+                raw_text: Raw text.
+            """
+            input = self.tokens[index]
+            mask = self.mask[index]
+            label = self.label[index]
+            h_pos = self.h_pos[index]
+            t_pos = self.t_pos[index]
+            h_end = self.h_end[index]
+            t_end = self.t_end[index]
+
+            raw_text = self.raw_text[index]
+
+            return input, mask, label, h_pos, t_pos, h_end, t_end, raw_text
 
 class CPDataset(data.Dataset):
     """Overwritten class Dataset for model CP.

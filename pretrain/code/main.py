@@ -69,7 +69,7 @@ def train(args, model, train_dataset):
             ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr, eps=args.adam_epsilon, correct_bias=False)
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=step_tot)
-    elif args.model == "TS":
+    elif args.model == "TS" or args.model == "TS_CP_SBERT":
         for name, param in model.named_parameters():
             if 'teacher_model' in name:
                 param.requires_grad = False
@@ -100,7 +100,7 @@ def train(args, model, train_dataset):
         if args.local_rank != -1:    # Distributed training
             train_sampler.set_epoch(i)
         for step, batch in enumerate(train_dataloader):
-        ######################## revised ###########################
+        
             if args.model == "MTB":
                 inputs = {"l_input": batch[0].to(args.device), "l_mask": batch[1].to(args.device),
                             "l_ph": batch[2].to(args.device), "l_pt": batch[3].to(args.device),
@@ -114,7 +114,11 @@ def train(args, model, train_dataset):
                         "label": batch[2].to(args.device), "h_pos": batch[3].to(args.device),
                         't_pos': batch[4].to(args.device), "h_end": batch[5].to(args.device),
                         "t_end": batch[6].to(args.device)}
-        ######################## revised ###########################
+            elif args.model == "TS_CP_SBERT":
+                inputs = {"input": batch[0].to(args.device), "mask": batch[1].to(args.device),
+                        "label": batch[2].to(args.device), "h_pos": batch[3].to(args.device),
+                        't_pos': batch[4].to(args.device), "h_end": batch[5].to(args.device),
+                        "t_end": batch[6].to(args.device), "raw_text": batch[7].to(args.device)}
 
             model.train()
             m_loss, r_loss = model(**inputs)
@@ -128,7 +132,7 @@ def train(args, model, train_dataset):
             # loss.sum().backward()
             if args.model == "MTB" or args.model == "CP":
                 loss.sum().backward()
-            elif args.model == "TS":
+            elif args.model == "TS" or "TS_CP_SBERT":
                 loss.backward()
             #########################
             
@@ -156,7 +160,13 @@ def train(args, model, train_dataset):
                         ckpt = {
                             'bert-base': model.module.student_model.bert.state_dict(),
                         }
-                    torch.save(ckpt, os.path.join("../ckpt/"+args.save_dir, "ckpt_of_step_"+str(global_step)))
+                    elif args.model == "TS_CP_SBERT":
+                        model.module.student_model.save(os.path.join("../ckpt/" + args.save_dir, "ckpt_of_step_" + str(global_step)))
+                    
+
+                    # torch.save(ckpt, os.path.join("../ckpt/"+args.save_dir, "ckpt_of_step_"+str(global_step)))
+                    if args.model != "TS_CP_SBERT":
+                        torch.save(ckpt, os.path.join("../ckpt/"+args.save_dir, "ckpt_of_step_"+str(global_step)))
 
                 # if args.local_rank in [0, -1] and global_step % 5 == 0:
                 #     step_record.append(global_step)
@@ -174,17 +184,21 @@ def train(args, model, train_dataset):
                     if args.local_rank in [0, -1]:
                         sys.stdout.write("step: %d, schedule: %.3f, mlm_loss: %.6f relation_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
                         sys.stdout.flush()
-                elif args.model == "TS":
+                elif args.model == "TS" or args.model == "TS_CP_SBERT":
                     if args.local_rank in [0, -1]:
                         sys.stdout.write("step: %d, schedule: %.3f, teacher_student_loss: %.6f student_student_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
                         sys.stdout.flush()
                         
         
-        if args.train_sample:
-            print("sampling...")
-            train_dataloader.dataset.__sample__()
-            print("sampled")
-
+        # if args.train_sample:
+        #     print("sampling...")
+        #     train_dataloader.dataset.__sample__()
+        #     print("sampled")
+        if args.model != "TS_CP_SBERT":
+            if args.train_sample:
+                print("sampling...")
+                train_dataloader.dataset.__sample__()
+                print("sampled")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="latentRE")
@@ -236,6 +250,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--teacher_model", dest="teacher_model", type=str,
                         default="../ckpt/ckpt_exp/end_to_first_concat/ckpt_of_step_60000", help="teacher model path")
+
+    parser.add_argument("--pooling_method", dest="pooling_method", type=str,
+                        default="mean", help="pooling method for entity marker representation after bert {mean, max, min}")
+
     parser.add_argument("--seed", dest="seed", type=int,
                         default=42, help="seed for network")
 
@@ -279,8 +297,11 @@ if __name__ == "__main__":
     elif args.model == "TS":
         model = TS(args).to(args.device)
         train_dataset = CPDataset("../data/CP", args)
+    elif args.model == "TS_CP_SBERT":
+        model = TS_CP_SBERT(args).to(args.device)
+        train_dataset = CP_SBERT_Dataset("../data/CP", args)
     else:
-        raise Exception("No such model! Please make sure that `model` takes the value in {MTB, CP, TS}")
+        raise Exception("No such model! Please make sure that `model` takes the value in {MTB, CP, TS, TS_CP_SBERT}")
 
     # Barrier to make sure all process train the model simultaneously.
     if args.local_rank != -1:
