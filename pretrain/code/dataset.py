@@ -51,7 +51,7 @@ class CP_SBERT_Dataset(data.Dataset):
         self.t_end = np.zeros((len(data)), dtype=int)
 
         self.raw_text_tokens = np.zeros((len(data), args.max_length), dtype=int)
-
+        
         for i, rel in enumerate(rel2scope.keys()):
             scope = rel2scope[rel]
             for j in range(scope[0], scope[1]):
@@ -67,6 +67,7 @@ class CP_SBERT_Dataset(data.Dataset):
             raw_text_ids = entityMarker.basic_tokenize(sentence["tokens"])
 
             length = min(len(ids), args.max_length)
+            raw_length = min(len(raw_text_ids), args.max_length)
             self.tokens[i][:length] = ids[:length]
             self.mask[i][:length] = 1
             self.h_pos[i] = min(args.max_length-1, ph) 
@@ -74,8 +75,7 @@ class CP_SBERT_Dataset(data.Dataset):
             self.h_end[i] = min(args.max_length-1, eh)
             self.t_end[i] = min(args.max_length-1, et)
 
-            self.raw_text_tokens[i][:length] = raw_text_ids[:length]
-
+            self.raw_text_tokens[i][:raw_length] = raw_text_ids[:raw_length]
 
     def __len__(self):
         """ Number of instances in an epoch.
