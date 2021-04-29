@@ -75,7 +75,7 @@ class TS_CP_SBERT(nn.Module):
         self.teacher_model.load_state_dict(model_dict)
 
         # student model
-        self.student_model = SentenceTransformer('bert-base-nli-mean-tokens')
+        self.student_model = SentenceTransformer('bert-base-nli-stsb-mean-tokens')
 
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.mseloss = nn.MSELoss()
@@ -101,6 +101,8 @@ class TS_CP_SBERT(nn.Module):
         teacher_outputs = self.teacher_model(input_ids=m_input, labels=m_labels, attention_mask=mask, output_hidden_states=True)
         student_outputs_raw_text = self.student_model.encode(raw_text, convert_to_tensor=True)   # [batch size, hidden size]
         student_outputs_entity_marker_text = self.student_model.encode(entity_marker_text, convert_to_tensor=True)   # [batch size, hidden size]
+        student_outputs_raw_text.requires_grad_(True)
+        student_outputs_entity_marker_text.requires_grad_(True)
 
         student_state_1 = student_outputs_raw_text
         student_state_2 = student_outputs_entity_marker_text
