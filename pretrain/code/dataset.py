@@ -9,7 +9,7 @@ sys.path.append("../../")
 from utils.utils import EntityMarker
 
 
-class TripleDataset(data.Dataset):
+class TRIPLEDataset(data.Dataset):
     """ Dataset for triple model.
     This class prepare data for training of triple.
     """

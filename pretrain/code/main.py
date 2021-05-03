@@ -2,8 +2,7 @@ import os
 import json
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.utils as utils
+
 import sys
 import argparse
 import matplotlib
@@ -15,26 +14,23 @@ import time
 import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 # from apex import amp
-from tqdm import tqdm
-from tqdm import trange
 from torch.utils import data
-from collections import Counter
 from transformers import AdamW, get_linear_schedule_with_warmup
 from dataset import *
 from model import *
 
-
-
 def log_loss(step_record, loss_record):
     if not os.path.exists("../img"):
         os.mkdir("../img")
+    if not os.path.exists("../img/" + args.save_dir):
+        os.mkdir("../img/" + args.save_dir)
     plt.plot(step_record, loss_record, lw=2)
     plt.xlabel('step')
     plt.ylabel('loss')
     plt.title('loss curve')
     plt.legend(loc="upper right")
     plt.grid(True)
-    plt.savefig(os.path.join("../img", 'loss_curve.png'))
+    plt.savefig(os.path.join("../img", args.save_dir, 'loss_curve.png'))
     plt.close()
 
 def set_seed(args):
@@ -60,7 +56,7 @@ def train(args, model, train_dataset):
     # optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr, eps=args.adam_epsilon, correct_bias=False)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=step_tot)
 
-    if args.model == "MTB" or args.model == "CP":
+    if args.model == "MTB" or args.model == "CP" or args.model == "TRIPLE":
         # optimizer
         no_decay = ['bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [
@@ -109,7 +105,7 @@ def train(args, model, train_dataset):
                             "label": batch[8].to(args.device), "l_eh": batch[9].to(args.device),
                             "l_et": batch[10].to(args.device), "r_eh": batch[11].to(args.device),
                             "r_et": batch[12].to(args.device)}
-            elif args.model == "CP" or args.model == "TS":
+            elif args.model == "CP" or args.model == "TS" or args.model == "TRIPLE":
                 inputs = {"input": batch[0].to(args.device), "mask": batch[1].to(args.device),
                         "label": batch[2].to(args.device), "h_pos": batch[3].to(args.device),
                         't_pos': batch[4].to(args.device), "h_end": batch[5].to(args.device),
@@ -130,8 +126,9 @@ def train(args, model, train_dataset):
             #     scaled_loss.backward()
             ########################
             # loss.sum().backward()
-            if args.model == "MTB" or args.model == "CP":
-                loss.sum().backward()
+            if args.model == "MTB" or args.model == "CP" or args.model == "TRIPLE":
+                # loss.sum().backward()
+                loss.backward()
             elif args.model == "TS" or "TS_CP_SBERT":
                 loss.backward()
             #########################
@@ -152,7 +149,7 @@ def train(args, model, train_dataset):
                     # ckpt = {
                     #     'bert-base': model.module.model.bert.state_dict(),
                     # }
-                    if args.model == "MTB" or args.model == "CP":
+                    if args.model == "MTB" or args.model == "CP" or args.model == "TRIPLE":
                         ckpt = {
                             'bert-base': model.module.model.bert.state_dict(),
                         }
@@ -168,19 +165,19 @@ def train(args, model, train_dataset):
                     if args.model != "TS_CP_SBERT":
                         torch.save(ckpt, os.path.join("../ckpt/"+args.save_dir, "ckpt_of_step_"+str(global_step)))
 
-                # if args.local_rank in [0, -1] and global_step % 5 == 0:
-                #     step_record.append(global_step)
-                #     loss_record.append(loss)
+                if args.local_rank in [0, -1] and global_step % 5 == 0:
+                    step_record.append(global_step)
+                    loss_record.append(loss)
                 
-                # if args.local_rank in [0, -1] and global_step % 500 == 0:
-                #     log_loss(step_record, loss_record)
+                if args.local_rank in [0, -1] and global_step % 500 == 0:
+                    log_loss(step_record, loss_record)
                 
 
 
                 # if args.local_rank in [0, -1]:
                 #     sys.stdout.write("step: %d, schedule: %.3f, mlm_loss: %.6f relation_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
                 #     sys.stdout.flush()
-                if args.model == "MTB" or args.model == "CP":
+                if args.model == "MTB" or args.model == "CP" or args.model == "TRIPLE":
                     if args.local_rank in [0, -1]:
                         sys.stdout.write("step: %d, schedule: %.3f, mlm_loss: %.6f relation_loss: %.6f\r" % (global_step, global_step/step_tot, m_loss, r_loss))
                         sys.stdout.flush()
@@ -282,7 +279,9 @@ if __name__ == "__main__":
     if args.local_rank in [0, -1]:
         if not os.path.exists("../log"):
             os.mkdir("../log")
-        with open("../log/pretrain_log", 'a+') as f:
+        if not os.path.exists("../log/" + args.save_dir):
+            os.mkdir("../log/" + args.save_dir)
+        with open(os.path.join("../log/" + args.save_dir, "pretrain_log"), 'a+') as f:
             f.write(str(time.ctime())+"\n")
             f.write(str(args)+"\n")
             f.write("----------------------------------------------------------------------------\n")
@@ -294,6 +293,9 @@ if __name__ == "__main__":
     elif args.model == "CP":
         model = CP(args).to(args.device)
         train_dataset = CPDataset("../data/CP", args)
+    elif args.model == "TRIPLE":
+        model = TRIPLE(args).to(args.device)
+        train_dataset = TRIPLEDataset("../data/TRIPLE", args)
     elif args.model == "TS":
         model = TS(args).to(args.device)
         train_dataset = CPDataset("../data/CP", args)
