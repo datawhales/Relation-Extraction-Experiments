@@ -309,10 +309,9 @@ class CPDataset(data.Dataset):
         self.label = np.zeros((len(data)), dtype=int)
         self.h_pos = np.zeros((len(data)), dtype=int)
         self.t_pos = np.zeros((len(data)), dtype=int)
-        ### revised
+
         self.h_end = np.zeros((len(data)), dtype=int)
         self.t_end = np.zeros((len(data)), dtype=int)
-        ### revised
 
         # Distant supervised label for sentence.
         # Sentences whose label are the same in a batch 
@@ -327,18 +326,17 @@ class CPDataset(data.Dataset):
             t_flag = random.random() > args.alpha
             h_p = sentence["h"]["pos"][0] 
             t_p = sentence["t"]["pos"][0]
-        ### revised
+
             ids, ph, pt, eh, et = entityMarker.tokenize(sentence["tokens"], [h_p[0], h_p[-1]+1], [t_p[0], t_p[-1]+1], None, None, h_flag, t_flag)
-        ### revised
+
             length = min(len(ids), args.max_length)
             self.tokens[i][:length] = ids[:length]
             self.mask[i][:length] = 1
             self.h_pos[i] = min(args.max_length-1, ph) 
             self.t_pos[i] = min(args.max_length-1, pt)
-        ### revised
+
             self.h_end[i] = min(args.max_length-1, eh)
             self.t_end[i] = min(args.max_length-1, et)
-        ### revised
 
         print("The number of sentence in which tokenizer can't find head/tail entity is %d" % entityMarker.err)
         # Samples positive pair dynamically. 
@@ -420,10 +418,10 @@ class CPDataset(data.Dataset):
         label = np.zeros((2), dtype=int)
         h_pos = np.zeros((2), dtype=int)
         t_pos = np.zeros((2), dtype=int)
-        ### revised
+
         h_end = np.zeros((2), dtype=int)
         t_end = np.zeros((2), dtype=int)
-        ### revised
+
 
 
         for i, ind in enumerate(bag):
@@ -432,14 +430,12 @@ class CPDataset(data.Dataset):
             label[i] = self.label[ind]
             h_pos[i] = self.h_pos[ind]
             t_pos[i] = self.t_pos[ind]
-        ### revised
+
             h_end[i] = self.h_end[ind]
             t_end[i] = self.t_end[ind]
-        ### revised
 
-        ### revised
         return input, mask, label, h_pos, t_pos, h_end, t_end
-        ### revised
+
 
 class MTBDataset(data.Dataset):
     """Overwritten class Dataset for model MTB.
