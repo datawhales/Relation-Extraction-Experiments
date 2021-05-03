@@ -73,76 +73,61 @@ class TRIPLE(nn.Module):
         # input: [batch size, max len * 3]
         # mask: [batch size, max len * 3]
         # label, h_pos, t_pos, h_end, t_end: [batch size, 3]
-        input = input.view(-1, self.args.max_length)    # [batch size * 3, max len]
-        mask = mask.view(-1, self.args.max_length)
-        label = label.view(-1)                          # [batch_size * 3]
-        h_pos = h_pos.view(-1)
-        t_pos = t_pos.view(-1)
-        h_end = h_end.view(-1)
-        t_end = t_end.view(-1)
+
+        anchor_input = input[:, :self.args.max_length]
+        anchor_mask = mask[:, :self.args.max_length]
+        anchor_label = label[:, 0]
+        anchor_h_pos, anchor_t_pos = h_pos[:, 0], t_pos[:, 0]
+        anchor_h_end, anchor_t_end = h_end[:, 0], t_end[:, 0]
+        
+        positive_input = input[:, :self.args.max_length]
+        positive_mask = mask[:, :self.args.max_length]
+        positive_label = label[:, 1]
+        positive_h_pos, positive_t_pos = h_pos[:, 1], t_pos[:, 1]
+        positive_h_end, positive_t_end = h_end[:, 1], t_end[:, 1]
+
+        negative_input = input[:, :self.args.max_length]
+        negative_mask = mask[:, :self.args.max_length]
+        negative_label = label[:, 2]
+        negative_h_pos, negative_t_pos = h_pos[:, 2], t_pos[:, 2]
+        negative_h_end, negative_t_end = h_end[:, 2], t_end[:, 2]
 
         # mask_tokens function does not mask entity mention.
-        indice = torch.arange(0, input.size()[0])
-        not_mask_pos = torch.zeros((input.size()[0], input.size()[1]), dtype=int)
-        not_mask_pos[indice, h_pos] = 1
-        not_mask_pos[indice, t_pos] = 1
-        not_mask_pos[indice, h_end] = 1
-        not_mask_pos[indice, t_end] = 1
+        batch_size = input.size()[0]
+        indice = torch.arange(0, batch_size)
+        anchor_not_mask_pos = torch.zeros((anchor_input.size()[0], anchor_input.size()[1]), dtype=int)   # [batch size, max len]
+        anchor_not_mask_pos[indice, anchor_h_pos] = 1
+        anchor_not_mask_pos[indice, anchor_t_pos] = 1
+        anchor_not_mask_pos[indice, anchor_h_end] = 1
+        anchor_not_mask_pos[indice, anchor_t_end] = 1
 
-        m_input, m_labels = mask_tokens(input.cpu(), self.tokenizer, not_mask_pos=not_mask_pos)
-        m_input = m_input.view(-1, self.args.max_length * 3)
-        m_labels = m_labels.view(-1, self.args.max_length * 3)
+        positive_not_mask_pos = torch.zeros((positive_input.size()[0], positive_input.size()[1]), dtype=int)   # [batch size, max len]
+        positive_not_mask_pos[indice, positive_h_pos] = 1
+        positive_not_mask_pos[indice, positive_t_pos] = 1
+        positive_not_mask_pos[indice, positive_h_end] = 1
+        positive_not_mask_pos[indice, positive_t_end] = 1
 
-        m_anchor_input = m_input[:, :self.args.max_length]
-        m_anchor_labels = m_labels[:, :self.args.max_length]
-        m_positive_input = m_input[:, self.args.max_length : 2 * self.args.max_length]
-        m_positive_labels = m_labels[:, self.args.max_length : 2 * self.args.max_length]
-        m_negative_input = m_input[:, 2 * self.args.max_length:]
-        m_negative_labels = m_labels[:, 2 * self.args.max_length:]
-        
-        input = input.view(-1, self.args.max_length * 3)    # [batch size, max len * 3]
-        mask = mask.view(-1, self.args.max_length * 3)
-        label = label.view(-1, 3)                           # [batch size, 3]
-        h_pos = h_pos.view(-1, 3)
-        t_pos = t_pos.view(-1, 3)
-        h_end = h_end.view(-1, 3)
-        t_end = t_end.view(-1, 3)
+        negative_not_mask_pos = torch.zeros((negative_input.size()[0], negative_input.size()[1]), dtype=int)   # [batch size, max len]
+        negative_not_mask_pos[indice, negative_h_pos] = 1
+        negative_not_mask_pos[indice, negative_t_pos] = 1
+        negative_not_mask_pos[indice, negative_h_end] = 1
+        negative_not_mask_pos[indice, negative_t_end] = 1
 
-        anchor_mask = mask[:, :self.args.max_length]
-        positive_mask = mask[:, self.args.max_length : 2 * self.args.max_length]
-        negative_mask = mask[:, 2 * self.args.max_length:]
-        
-        anchor_label = label[:, :1]
-        positive_label = label[:, 1:2]
-        negative_label = label[:, 2:]
-
-        anchor_h_pos = h_pos[:, :1]
-        positive_h_pos = h_pos[:, 1:2]
-        negative_h_pos = h_pos[:, 2:]
-
-        anchor_t_pos = t_pos[:, :1]
-        positive_t_pos = t_pos[:, 1:2]
-        negative_t_pos = t_pos[:, 2:]
-
-        anchor_h_end = h_end[:, :1]
-        positive_h_end = h_end[:, 1:2]
-        negative_h_end = h_end[:, 2:]
-
-        anchor_t_end = t_end[:, :1]
-        positive_t_end = t_end[:, 1:2]
-        negative_t_end = t_end[:, 2:]
+        m_anchor_input, m_anchor_labels = mask_tokens(anchor_input.cpu(), self.tokenizer, not_mask_pos=anchor_not_mask_pos)
+        m_positive_input, m_positive_labels = mask_tokens(positive_input.cpu(), self.tokenizer, not_mask_pos=positive_not_mask_pos)
+        m_negative_input, m_negative_labels = mask_tokens(negative_input.cpu(), self.tokenizer, not_mask_pos=negative_not_mask_pos)
 
         m_anchor_outputs = self.model(input_ids=m_anchor_input, labels=m_anchor_labels, attention_mask=anchor_mask, output_hidden_states=True)
         m_positive_outputs = self.model(input_ids=m_positive_input, labels=m_positive_labels, attention_mask=positive_mask, output_hidden_states=True)
         m_negative_outputs = self.model(input_ids=m_negative_input, labels=m_negative_labels, attention_mask=negative_mask, output_hidden_states=True)
         
-        mask_loss = m_anchor_outputs.loss + m_positive_outputs.loss + m_negative_outputs.loss
+        m_loss = m_anchor_outputs.loss + m_positive_outputs.loss + m_negative_outputs.loss
         
         anchor_last_hidden_state = m_anchor_outputs.hidden_states[-1]
         positive_last_hidden_state = m_positive_outputs.hidden_states[-1]
         negative_last_hidden_state = m_negative_outputs.hidden_states[-1]
 
-        indice = torch.arange(0, input.size()[0])
+        indice = torch.arange(0, anchor_input.size()[0])
 
         anchor_h_start_state = anchor_last_hidden_state[indice, anchor_h_pos]      # [batch size, hidden size]
         anchor_h_end_state = anchor_last_hidden_state[indice, anchor_h_end]
@@ -251,7 +236,7 @@ class TRIPLE(nn.Module):
             
         r_loss = self.tripletloss(anchor_state, positive_state, negative_state)
 
-        return r_loss
+        return m_loss, r_loss
 
 class TS_CP_SBERT(nn.Module):
     """ Teacher-Student model between CP model and SBERT model.
