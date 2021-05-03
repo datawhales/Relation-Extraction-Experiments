@@ -69,10 +69,10 @@ class TS_CP_SBERT(nn.Module):
         # teacher model
         teacher_model_ckpt = torch.load(args.teacher_model)
         self.teacher_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
-        model_dict = self.teacher_model.state_dict()
+        model_dict = self.teacher_model.bert.state_dict()
         pretrained_dict = {k: v for k, v in teacher_model_ckpt['bert-base'].items() if k in model_dict}
         model_dict.update(pretrained_dict)
-        self.teacher_model.load_state_dict(model_dict)
+        self.teacher_model.bert.load_state_dict(model_dict)
 
         # student model
         self.student_model = SentenceTransformer('bert-base-nli-stsb-mean-tokens')
@@ -150,10 +150,10 @@ class TS(nn.Module):
         super().__init__()
         teacher_model_ckpt = torch.load(args.teacher_model)
         self.teacher_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
-        model_dict = self.teacher_model.state_dict()
+        model_dict = self.teacher_model.bert.state_dict()
         pretrained_dict = {k: v for k, v in teacher_model_ckpt['bert-base'].items() if k in model_dict}
         model_dict.update(pretrained_dict)
-        self.teacher_model.load_state_dict(model_dict)
+        self.teacher_model.bert.load_state_dict(model_dict)
 
         self.student_model = BertForMaskedLM.from_pretrained('bert-base-uncased')
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
