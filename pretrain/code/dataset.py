@@ -3,16 +3,183 @@ import random
 import os 
 import sys 
 sys.path.append("..")
-
-import re 
-import pdb 
-import math 
-import torch
 import numpy as np  
-from collections import Counter
 from torch.utils import data
 sys.path.append("../../")
 from utils.utils import EntityMarker
+
+
+class TripleDataset(data.Dataset):
+    """ Dataset for triple model.
+    This class prepare data for training of triple.
+    """
+    def __init__(self, path, args):
+        """Inits tokenized sentence and [anchor, positive, negative] triplets for triple model.
+        
+        Args:
+            path: path to your dataset.
+            args: args from command line.
+        
+        Returns:
+            No returns
+        
+        Raises:
+            If the dataset in `path` is not the same format as described in 
+            file 'prepare_data.py', there may raise:
+                - `key not found`
+                - `integer can't be indexed`
+                and so on.
+        """
+        self.path = path
+        self.args = args
+        data = json.load(open(os.path.join(path, "tripledata.json")))
+        rel2scope = json.load(open(os.path.join(path, "rel2scope.json")))
+        entityMarker = EntityMarker()
+
+        self.tokens = np.zeros((len(data), args.max_length), dtype=int)
+        self.mask = np.zeros((len(data), args.max_length), dtype=int)
+        self.label = np.zeros((len(data)), dtype=int)
+        self.h_pos = np.zeros((len(data)), dtype=int)
+        self.t_pos = np.zeros((len(data)), dtype=int)
+        self.h_end = np.zeros((len(data)), dtype=int)
+        self.t_end = np.zeros((len(data)), dtype=int)
+
+        # Distant supervised label for sentence.
+        for i, rel in enumerate(rel2scope.keys()):
+            scope = rel2scope[rel]
+            for j in range(scope[0], scope[1]):
+                self.label[j] = i
+
+        for i, sentence in enumerate(data):
+            h_flag = random.random() > args.alpha
+            t_flag = random.random() > args.alpha
+            h_p = sentence["h"]["pos"][0]
+            t_p = sentence["t"]["pos"][0]
+            
+            ids, ph, pt, eh, et = entityMarker.tokenize(sentence["tokens"], [h_p[0], h_p[-1]+1], [t_p[0], t_p[-1]+1], None, None, h_flag, t_flag)
+
+            length = min(len(ids), args.max_length)
+            self.tokens[i][:length] = ids[:length]
+            self.mask[i][:length] = 1
+            self.h_pos[i] = min(args.max_length-1, ph)
+            self.t_pos[i] = min(args.max_length-1, pt)
+            self.h_end[i] = min(args.max_length-1, eh)
+            self.t_end[i] = min(args.max_length-1, et)
+            
+        print(f"The number of sentence in which tokenizer can't find head/tail entity is {entityMarker.err}")
+
+        # samples triplets
+        self.__sample__()
+
+    def __get_mean_token_length_of_each_rel__(self):
+        """ To generate anchor sentences, find out mean length of sentences in each relation.
+        """
+        data = json.load(open(os.path.join(self.path, "tripledata.json")))
+        rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
+        mean_dict = dict()
+        for key in rel2scope.keys():
+            scope = rel2scope[key]
+            mean = 0
+            rel_num = scope[1] - scope[0]
+            for i in range(scope[0], scope[1]):
+                mean += len(data[i]['tokens'])
+            mean = mean / rel_num
+            mean_dict[key] = mean
+        return mean_dict
+
+    def __get_anchors__(self):
+        """ Generate anchor sentences.
+        Use the sentence with the minimum difference as the anchor sentence.
+        """
+        data = json.load(open(os.path.join(self.path, "tripledata.json")))
+        rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
+        anchor_dict = dict()
+
+        mean_dict = self.__get_mean_token_length_of_each_rel__()
+        for key in rel2scope.keys():
+            scope = rel2scope[key]
+            for i in range(scope[0], scope[1]):
+                diff = abs(mean_dict[key] - len(data[i]['tokens']))
+                if i == scope[0]:
+                    min_diff = diff
+                    anchor_dict[key] = [i, data[i]['tokens']]
+                else:
+                    if diff < min_diff:
+                        min_diff = diff
+                        anchor_dict[key] = [i, data[i]['tokens']]
+        return anchor_dict
+    
+    def __sample__(self):
+        """Samples triplets.
+        After sampling, `self.triplet` is all pairs sampled.
+        `self.triplet` example: 
+                [
+                    [0, 1, 674723],
+                    [0, 2, 739671],
+                    [0, 3, 47562],
+                    [5, 4, 197608],
+                    ...
+                ]
+        """
+        rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
+        rel_key_list = list(rel2scope.keys())
+        anchor_dict = self.__get_anchors__()
+
+        self.triplet = []
+        for index, key in enumerate(rel_key_list):
+            scope = rel2scope[key]
+            for i in range(scope[0], scope[1]):
+                if i == anchor_dict[key][0]:
+                    continue
+
+                neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+
+                if neg_rel_index == index:
+                    while neg_rel_index == index:
+                        neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+                
+                neg_key = rel_key_list[neg_rel_index]
+
+                neg_scopes = rel2scope[neg_key]
+                neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+
+                self.triplet.append([anchor_dict[key][0], i, neg_rel])
+
+        print(f"The number of triplets is {len(self.triplet)}")
+
+    def __len__(self):
+        """ Number of instances in an epoch.
+        """
+        return len(self.triplet)
+
+    def __getitem__(self, index):
+        """ Get training instance.
+
+        Args:
+            index: Instance index.
+
+        Return:
+            
+        """
+        bag = self.triplet[index]
+        input = np.zeros((self.args.max_length * 3), dtype=int)
+        mask = np.zeros((self.args.max_length * 3), dtype=int)
+        label = np.zeros((3), dtype=int)
+        h_pos = np.zeros((3), dtype=int)
+        t_pos = np.zeros((3), dtype=int)
+        h_end = np.zeros((3), dtype=int)
+        t_end = np.zeros((3), dtype=int)
+        
+        for i, ind in enumerate(bag):
+            input[i * self.args.max_length : (i+1) * self.args.max_length] = self.tokens[ind]
+            mask[i * self.args.max_length : (i+1) * self.args.max_length] = self.mask[ind]
+            label[i] = self.label[ind]
+            h_pos[i] = self.h_pos[ind]
+            t_pos[i] = self.t_pos[ind]
+            h_end[i] = self.h_end[ind]
+            t_end[i] = self.t_end[ind]
+        
+        return input, mask, label, h_pos, t_pos, h_end, t_end
 
 class CP_SBERT_Dataset(data.Dataset):
     """ Dataset for teacher-student model which uses CP as teacher model

@@ -2,14 +2,10 @@ import json
 import random
 import os 
 import sys 
-import pdb 
-import re 
 import torch
 import argparse
-import numpy as np 
-from tqdm import trange
-from collections import Counter, defaultdict
-
+import numpy as np
+from collections import defaultdict
 
 def filter_sentence(sentence):
     """Filter sentence.
@@ -47,6 +43,83 @@ def filter_sentence(sentence):
 
     return False
 
+def process_data_for_Triple(data):
+    """ Process data for Triple.
+    This function will filter NA relation, abnormal sentences,
+    and relation of which sentence number is less than 2(cannot form positivie pair).
+
+    Args:
+        data: Original data for pre-training and is a dict whose key is relation.
+            data example:
+                {
+                    'P1': [
+                        {
+                            'tokens': ['Microsoft', 'was', 'founded', 'by', 'Bill', 'Gates', '.']
+                            'h': {'pos':[[0]], 'name': 'Microsoft', 'id': Q123456},
+                            't': {'pos':[[4,5]], 'name': 'Bill Gates', 'id': Q2333},
+                            'r': 'P1'
+                        },
+                        ...
+                    ],
+                    ...
+                }
+    
+    Returns:
+        No returns.
+        This function will save two json-formatted files:
+            - list_data: A list of sentences.
+            - rel2scope: A python dict whose key is relation and value is 
+                a scope which is left-closed-right-open `[)`. All sentences 
+                in a same scope share the same relation.
+            
+            example:
+                - list_data:
+                    [
+                        {
+                            'tokens': ['Microsoft', 'was', 'founded', 'by', 'Bill', 'Gates', '.']
+                            'h': {'pos':[[0]], 'name': 'Microsoft', 'id': Q123456},
+                            't': {'pos':[[4,5]], 'name': 'Bill Gates', 'id': Q2333},
+                            'r': 'P1'
+                        },
+                        ...
+                    ]
+                
+                - rel2scope:
+                    {
+                        'P10': [0, 233],
+                        'P1212': [233, 1000],
+                        ....
+                    }
+
+    Raises:
+        If data's format isn't the same as described above,
+        this function may raise `key not found` error by Python Interpreter.
+    """
+    washed_data = {}
+    for key in data.keys():
+        if key == "P0":
+            continue
+        rel_sentence_list = []
+        for sen in data[key]:
+            if filter_sentence(sen):
+                continue
+            rel_sentence_list.append(sen)
+        if len(rel_sentence_list) < 2:
+            continue        
+        washed_data[key] = rel_sentence_list
+
+    ll = 0
+    rel2scope = {}
+    list_data = []
+    for key in washed_data.keys():
+        list_data.extend(washed_data[key])
+        rel2scope[key] = [ll, len(list_data)]
+        ll = len(list_data)
+
+    if not os.path.exists("../data/TRIPLE"):
+        os.mkdir("../data/TRIPLE")
+    json.dump(list_data, open("../data/TRIPLE/tripledata.json","w"))
+    json.dump(rel2scope, open("../data/TRIPLE/rel2scope.json", 'w'))
 
 def process_data_for_CP(data):
     """Process data for CP. 
@@ -258,4 +331,6 @@ if __name__ == "__main__":
 
     elif args.dataset == "MTB":
         process_data_for_MTB(data)
-    
+
+    elif args.dataset == "TRIPLE":
+        process_data_for_Triple(data)
