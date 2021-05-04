@@ -8,5 +8,6 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node
 	--alpha 0.3 \
 	--temperature 0.05 \
 	--train_sample \
-	--save_dir ckpt_triple/entity_marker_anchor_7 \
+	--save_dir ckpt_triple/entity_marker_anchor_min \
 	--output_representation entity_marker \
+    --anchor_method min

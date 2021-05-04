@@ -54,8 +54,10 @@ class REDataset(torch.utils.data.Dataset):
         #################### modified ######################
 
         for i, item in enumerate(data):
-            self.label[i] = rel2id[item["relation"]]    # i+1 번째 문장의 relation id
-            
+            if args.dataset == "wiki80" or args.dataset == "semeval":
+                self.label[i] = rel2id[item["relation"]]    # i+1 번째 문장의 relation id
+            elif args.dataset == "chemprot":
+                self.label[i] = rel2id[item["label"]]
             # tokenize
             if args.mode == "CM":
         #################### modified ######################
