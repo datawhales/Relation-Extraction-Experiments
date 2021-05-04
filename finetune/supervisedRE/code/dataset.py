@@ -90,11 +90,7 @@ class REDataset(torch.utils.data.Dataset):
         h_pos = self.h_pos[index]
         t_pos = self.t_pos[index]
         label = self.label[index]
-        #################### modified ######################
         h_end = self.h_end[index]
         t_end = self.t_end[index]
-        #################### modified ######################
 
-        #################### modified ######################
         return input_ids, mask, h_pos, t_pos, label, h_end, t_end, index
-        #################### modified ######################

@@ -4,26 +4,20 @@ import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.utils as utils
 import sys
 import argparse
 import matplotlib
-import pdb
 import numpy as np 
-import time
 import random
 import time
 import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 # from apex import amp
-from tqdm import trange
 from torch.utils import data
 from collections import Counter
 from transformers import AdamW, get_linear_schedule_with_warmup
 from dataset import *
 from model import *
-
-
 
 def f1_score(output, label, rel_num):
     correct_by_relation = Counter()
@@ -261,8 +255,11 @@ if __name__ == "__main__":
     #                     help="if entity marker or cls")
     # revised
     parser.add_argument("--output_representation", dest="output_representation", type=str,
-                        default="entity_marker", help="output representation {CLS, entity marker, all_markers, end_to_first}")
-    # revised
+                        default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat, marker_minus}")
+    
+    parser.add_argument("--pooling_method", dest="pooling_method", type=str,
+                        default="mean", help="pooling method for entity marker representation after bert {mean, max, min}")
+
     parser.add_argument("--train_prop", dest="train_prop", type=float,
                         default=1, help="train set prop")
     

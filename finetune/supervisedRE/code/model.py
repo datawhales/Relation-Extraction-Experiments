@@ -1,5 +1,4 @@
 import torch
-import pdb
 import torch.nn as nn
 from transformers import BertModel
 
@@ -21,7 +20,7 @@ class REModel(nn.Module):
         # scale = 2 if args.output_representation == "entity_marker" else 1
         ## all_markers_concat -> scale 4
         ## entity_marker, end_to_first_concat -> scale 2
-        ## all_markers, end_to_first, [CLS] -> scale 1
+        ## all_markers, end_to_first, marker_minus, [CLS] -> scale 1
         if args.output_representation == "all_markers_concat":
             scale = 4
         elif args.output_representation == "entity_marker" or args.output_representation == "end_to_first_concat":
