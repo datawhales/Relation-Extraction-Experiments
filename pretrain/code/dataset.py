@@ -87,6 +87,34 @@ class TRIPLEDataset(data.Dataset):
             mean_dict[key] = mean
         return mean_dict
 
+    def __get_min_token_length_of_each_rel__(self):
+        """ To generate anchor sentences, find out min length of sentences in each relation.
+        """
+        data = json.load(open(os.path.join(self.path, "tripledata.json")))
+        rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
+        min_dict = dict()
+        for key in rel2scope.keys():
+            scope = rel2scope[key]
+            for i in range(scope[0], scope[1]):
+                if i == scope[0]:
+                    min_len = len(data[i]['tokens'])
+                    continue
+                if len(data[i]['tokens']) > min_len:
+                    min_len = len(data[i]['tokens'])
+            min_dict[key] = min_len
+        return min_dict            
+
+    def __get_user_token_length_of_each_rel__(self, length):
+        """ To generate anchor sentences, make dictionary of specific length user choosed.
+        """
+        data = json.load(open(os.path.join(self.path, "tripledata.json")))
+        rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
+        user_dict = dict()
+        for key in rel2scope.keys():
+            scope = rel2scope[key]
+            user_dict[key] = length
+        return user_dict
+
     def __get_anchors__(self):
         """ Generate anchor sentences.
         Use the sentence with the minimum difference as the anchor sentence.
@@ -95,11 +123,18 @@ class TRIPLEDataset(data.Dataset):
         rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
         anchor_dict = dict()
 
-        mean_dict = self.__get_mean_token_length_of_each_rel__()
+        if self.args.anchor_method == "mean":
+            standard_dict = self.__get_mean_token_length_of_each_rel__()
+        elif self.args.anchor_method == "min":
+            standard_dict = self.__get_min_token_length_of_each_rel__()
+        elif self.args.anchor_method == "user":
+            user_length = self.args.user_length
+            standard_dict = self.__get_user_token_length_of_each_rel__(user_length)
+        
         for key in rel2scope.keys():
             scope = rel2scope[key]
             for i in range(scope[0], scope[1]):
-                diff = abs(mean_dict[key] - len(data[i]['tokens']))
+                diff = abs(standard_dict[key] - len(data[i]['tokens']))
                 if i == scope[0]:
                     min_diff = diff
                     anchor_dict[key] = [i, data[i]['tokens']]

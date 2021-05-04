@@ -240,10 +240,13 @@ if __name__ == "__main__":
                         default=10000, help="step to save")
     parser.add_argument("--save_dir", dest="save_dir", type=str,
                         default="", help="ckpt dir to save")
-    #### revised
+    
     parser.add_argument("--output_representation", dest="output_representation", type=str,
                         default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat, marker_minus}")
-    #### revised
+    parser.add_argument("--anchor_method", dest="anchor_method", type=str,
+                        default="user", help="anchor method {user, min, mean}")
+    parser.add_argument("--user_length", dest="user_length", type=int,
+                        default=7, help="user length used in anchor method")
 
     parser.add_argument("--teacher_model", dest="teacher_model", type=str,
                         default="../ckpt/ckpt_exp/end_to_first_concat/ckpt_of_step_60000", help="teacher model path")
