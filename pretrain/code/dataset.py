@@ -207,17 +207,18 @@ class TRIPLEDataset(Dataset):
                     neg_scopes = rel2scope[neg_key]
                     neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
 
-                    # to sample negative pair which has similar length of tokens with positive pair
-                    cnt = 0
-                    if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) > 5:
-                        while abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) > 5:
-                            neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
-                            cnt += 1
-                        if cnt >= (scope[1] - scope[0]):
-                            break
-                    if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) <= 5:
-                        self.triplet.append([anchor_dict[key][0], i, neg_rel])
-
+                    # # to sample negative pair which has similar length of tokens with positive pair
+                    # cnt = 0
+                    # if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) > 5:
+                    #     while abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) > 5:
+                    #         neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+                    #         cnt += 1
+                    #     if cnt >= (scope[1] - scope[0]):
+                    #         break
+                    # if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) <= 5:
+                    #     self.triplet.append([anchor_dict[key][0], i, neg_rel])
+                    self.triplet.append([anchor_dict[key][0], i, neg_rel])
+                    
         print(f"The number of triplets is {len(self.triplet)}")
 
     def __len__(self):
