@@ -66,8 +66,8 @@ class TRIPLE(nn.Module):
         super().__init__()
         self.model = BertForMaskedLM.from_pretrained('bert-base-uncased')
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        self.tripletloss = nn.TripletMarginLoss(margin=3.0, p=2)
         self.args = args
+        self.tripletloss = nn.TripletMarginLoss(margin=args.margin, p=2)
 
     def forward(self, input, mask, label, h_pos, t_pos, h_end, t_end):
         # input: [batch size, max len * 3]

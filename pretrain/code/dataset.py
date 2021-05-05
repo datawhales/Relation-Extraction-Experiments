@@ -4,12 +4,12 @@ import os
 import sys 
 sys.path.append("..")
 import numpy as np  
-from torch.utils import data
+from torch.utils.data import Dataset
 sys.path.append("../../")
 from utils.utils import EntityMarker
 
 
-class TRIPLEDataset(data.Dataset):
+class TRIPLEDataset(Dataset):
     """ Dataset for triple model.
     This class prepare data for training of triple.
     """
@@ -156,29 +156,67 @@ class TRIPLEDataset(data.Dataset):
                     ...
                 ]
         """
+        data = json.load(open(os.path.join(self.path, "tripledata.json")))
         rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
         rel_key_list = list(rel2scope.keys())
-        anchor_dict = self.__get_anchors__()
 
-        self.triplet = []
-        for index, key in enumerate(rel_key_list):
-            scope = rel2scope[key]
-            for i in range(scope[0], scope[1]):
-                if i == anchor_dict[key][0]:
-                    continue
-
-                neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
-
-                if neg_rel_index == index:
-                    while neg_rel_index == index:
-                        neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+        if self.args.anchor_feature == "random":
+            self.triplet = []
+            for i, key in enumerate(rel2scope.keys()):
+                scope = rel2scope[key]
                 
-                neg_key = rel_key_list[neg_rel_index]
+                pos_scope = list(range(scope[0], scope[1]))
+                random.shuffle(pos_scope)
+                
+                bag = []
+                for i, index in enumerate(pos_scope):
+                    bag.append(index)
+                    if i % 2 == 1:
+                        neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+                        
+                        if neg_rel_index == i:
+                            while neg_rel_index == i:
+                                neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+                        neg_key = rel_key_list[neg_rel_index]
+                        neg_scopes = rel2scope[neg_key]
+                        neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+                        
+                        bag.append(neg_rel)
+                        
+                        self.triplet.append(bag)
+                        bag = []
 
-                neg_scopes = rel2scope[neg_key]
-                neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+        else:
+            anchor_dict = self.__get_anchors__()
 
-                self.triplet.append([anchor_dict[key][0], i, neg_rel])
+            self.triplet = []
+            for index, key in enumerate(rel_key_list):
+                scope = rel2scope[key]
+                for i in range(scope[0], scope[1]):
+                    if i == anchor_dict[key][0]:
+                        continue
+
+                    neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+
+                    if neg_rel_index == index:
+                        while neg_rel_index == index:
+                            neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+                    
+                    neg_key = rel_key_list[neg_rel_index]
+
+                    neg_scopes = rel2scope[neg_key]
+                    neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+
+                    # to sample negative pair which has similar length of tokens with positive pair
+                    cnt = 0
+                    if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) > 5:
+                        while abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) > 5:
+                            neg_rel = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+                            cnt += 1
+                        if cnt >= (scope[1] - scope[0]):
+                            break
+                    if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) <= 5:
+                        self.triplet.append([anchor_dict[key][0], i, neg_rel])
 
         print(f"The number of triplets is {len(self.triplet)}")
 
@@ -216,7 +254,7 @@ class TRIPLEDataset(data.Dataset):
         
         return input, mask, label, h_pos, t_pos, h_end, t_end
 
-class CP_SBERT_Dataset(data.Dataset):
+class CP_SBERT_Dataset(Dataset):
     """ Dataset for teacher-student model which uses CP as teacher model
         and SBERT as student model.  
     """
@@ -312,7 +350,7 @@ class CP_SBERT_Dataset(data.Dataset):
 
         return input, mask, label, h_pos, t_pos, h_end, t_end, raw_text_id
 
-class CPDataset(data.Dataset):
+class CPDataset(Dataset):
     """Overwritten class Dataset for model CP.
     This class prepare data for training of CP.
     """
@@ -472,7 +510,7 @@ class CPDataset(data.Dataset):
         return input, mask, label, h_pos, t_pos, h_end, t_end
 
 
-class MTBDataset(data.Dataset):
+class MTBDataset(Dataset):
     """Overwritten class Dataset for model MTB.
     This class prepare data for training of MTB.
     """

@@ -6,5 +6,5 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 	--dataset wiki80 \
 	--ckpt_to_load ckpt_triple/all_markers_max/ckpt_of_step_60000 \
 	--output_representation all_markers \
-    --pooling_method max
+    --pooling_method max \
 	--train_prop 1 \
