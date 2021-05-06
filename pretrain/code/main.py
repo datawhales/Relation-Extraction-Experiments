@@ -248,7 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--user_length", dest="user_length", type=int,
                         default=7, help="user length used in anchor method")
     parser.add_argument("--anchor_feature", dest="anchor_feature", type=str,
-                        default="one", help="use one anchor per relation or random or ..")
+                        default="one", help="use one anchor per relation or random or marker_dist")
 
     parser.add_argument("--margin", dest="margin", type=float,
                         default=1.0, help="margin for triplet loss")         

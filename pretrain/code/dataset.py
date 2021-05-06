@@ -186,6 +186,113 @@ class TRIPLEDataset(Dataset):
                         self.triplet.append(bag)
                         bag = []
 
+        elif self.args.anchor_feature == "marker_dist":
+            self.triplet = []
+            total_list = list(range(len(data)))
+            
+            for i, key in enumerate(rel2scope.keys()):
+                pair_lst = []
+                scope = rel2scope[key]
+                pos_scope = list(range(scope[0], scope[1]))
+                # sort by entity marker distance
+                pos_scope.sort(key=lambda x: abs(data[x]['t']['pos'][0][0] - data[x]['h']['pos'][0][0]))
+                # set anchor 10% of each relation
+                gold_anchor_list = pos_scope[:len(pos_scope) // 10]
+                gold_positive_list = pos_scope[len(pos_scope) // 10:]
+                gold_positive_list = [x for x in gold_positive_list if x in total_list]
+                # 90% shuffle
+                random.shuffle(gold_positive_list)
+                
+                if not gold_anchor_list:
+                    anchor_list = gold_positive_list[:len(gold_positive_list) // 2]
+                    positive_list = gold_positive_list[len(gold_positive_list) // 2:]
+                    if len(positive_list) > len(anchor_list):
+                        positive_list = positive_list[:-1]
+                        
+                    anchor_num = len(anchor_list)
+                    
+                    if len(total_list) < anchor_num:
+                        total_list = list(range(len(data)))
+                        
+                    left = [x for x in total_list if x not in range(scope[0], scope[1])]
+                    
+                    negative_list = random.sample(left, anchor_num)
+                    
+                    for index in range(anchor_num):
+                        anchor = anchor_list[index]
+                        positive = positive_list[index]
+                        negative = negative_list[index]
+                        
+                        if anchor in total_list:
+                            total_list.remove(anchor)
+                        if positive in total_list:
+                            total_list.remove(positive)
+                        if negative in total_list:
+                            total_list.remove(negative)
+                    
+                        pair_lst.append([anchor, positive, negative])
+                        
+                    self.triplet.extend(pair_lst)
+                    
+                # gold anchor exists
+                else:
+                    random.shuffle(gold_anchor_list)
+                    
+                    anchor_num = len(gold_anchor_list) // 2
+                    
+                    if len(total_list) == 0:
+                        total_list = list(range(len(data)))
+                        
+                    left = [x for x in total_list if x not in range(scope[0], scope[1])]
+                    
+                    negative_list = random.sample(left, anchor_num)
+                    
+                    bag = []
+                    for i, anchor in enumerate(gold_anchor_list):
+                        bag.append(anchor)
+                        if i % 2 == 1:
+                            negative = negative_list[i // 2]
+                            bag.append(negative)              
+
+                            if negative in total_list:
+                                total_list.remove(negative)
+                                
+                            pair_lst.append(bag)
+                            bag = []
+                    
+                    self.triplet.extend(pair_lst)
+                    
+                    # not gold_anchors
+                    anchor_list = gold_positive_list[:len(gold_positive_list) // 2]
+                    positive_list = gold_positive_list[len(gold_positive_list) // 2:]
+                    if len(positive_list) > len(anchor_list):
+                        positive_list = positive_list[:-1]
+
+                    anchor_num = len(anchor_list)
+                    
+                    if len(total_list) < anchor_num:
+                        total_list = list(range(len(data)))
+                        
+                    left = [x for x in total_list if x not in range(scope[0], scope[1])]
+                    
+                    negative_list = random.sample(left, anchor_num)
+                    
+                    for index in range(anchor_num):
+                        anchor = anchor_list[index]
+                        positive = positive_list[index]
+                        negative = negative_list[index]
+                        
+                        if anchor in total_list:
+                            total_list.remove(anchor)
+                        if positive in total_list:
+                            total_list.remove(positive)
+                        if negative in total_list:
+                            total_list.remove(negative)
+                    
+                        pair_lst.append([anchor, positive, negative])
+                    
+                    self.triplet.extend(pair_lst)
+    
         else:
             anchor_dict = self.__get_anchors__()
 
@@ -218,7 +325,7 @@ class TRIPLEDataset(Dataset):
                     # if abs(len(data[i]['tokens']) - len(data[neg_rel]['tokens'])) <= 5:
                     #     self.triplet.append([anchor_dict[key][0], i, neg_rel])
                     self.triplet.append([anchor_dict[key][0], i, neg_rel])
-                    
+
         print(f"The number of triplets is {len(self.triplet)}")
 
     def __len__(self):
