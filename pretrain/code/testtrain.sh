@@ -4,7 +4,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node
 	--lr 3e-5 --batch_size_per_gpu $1 --max_epoch 20 \
 	--gradient_accumulation_steps 1 \
 	--max_length 64 \
-	--save_step 500 \
+	--save_step 5000 \
 	--alpha 0.3 \
 	--temperature 0.05 \
 	--train_sample \

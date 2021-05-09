@@ -210,8 +210,10 @@ class TRIPLEDataset(Dataset):
                         positive_list = positive_list[:-1]
                         
                     anchor_num = len(anchor_list)
-                    
-                    if len(total_list) < anchor_num:
+                        
+                    left = [x for x in total_list if x not in range(scope[0], scope[1])]
+
+                    if len(left) < anchor_num:
                         total_list = list(range(len(data)))
                         
                     left = [x for x in total_list if x not in range(scope[0], scope[1])]
@@ -239,8 +241,10 @@ class TRIPLEDataset(Dataset):
                     random.shuffle(gold_anchor_list)
                     
                     anchor_num = len(gold_anchor_list) // 2
+                        
+                    left = [x for x in total_list if x not in range(scope[0], scope[1])]
                     
-                    if len(total_list) == 0:
+                    if len(left) < anchor_num:
                         total_list = list(range(len(data)))
                         
                     left = [x for x in total_list if x not in range(scope[0], scope[1])]
@@ -263,16 +267,17 @@ class TRIPLEDataset(Dataset):
                     self.triplet.extend(pair_lst)
                     
                     # not gold_anchors
-                    anchor_list = gold_positive_list[:len(gold_positive_list) // 2]
-                    positive_list = gold_positive_list[len(gold_positive_list) // 2:]
-                    if len(positive_list) > len(anchor_list):
-                        positive_list = positive_list[:-1]
+                    anchor_list = gold_anchor_list * (len(gold_positive_list) // len(gold_anchor_list) + 1)
+                    random.shuffle(anchor_list)
+                    positive_list = gold_positive_list[:]
 
-                    anchor_num = len(anchor_list)
+                    anchor_num = min(len(anchor_list), len(positive_list))
                     
-                    if len(total_list) < anchor_num:
+                    left = [x for x in total_list if x not in range(scope[0], scope[1])]
+
+                    if len(left) < anchor_num:
                         total_list = list(range(len(data)))
-                        
+                    
                     left = [x for x in total_list if x not in range(scope[0], scope[1])]
                     
                     negative_list = random.sample(left, anchor_num)
@@ -540,17 +545,29 @@ class CPDataset(Dataset):
             we resample sentence pair, i.e. dynamic sampling.
         """
         pos_scope = list(range(scope[0], scope[1]))
+        data = json.load(open(os.path.join(self.path, "cpdata.json")))
         
         # shuffle bag to get different pairs
-        random.shuffle(pos_scope)   
-        all_pos_pair = []
-        bag = []
-        for i, index in enumerate(pos_scope):
-            bag.append(index)
-            if (i+1) % 2 == 0:
-                all_pos_pair.append(bag)
-                bag = []
-        return all_pos_pair
+        random.shuffle(pos_scope)
+        if self.args.anchor_feature == "one":
+            pos_scope.sort(key=lambda x: abs(data[x]['t']['pos'][0][0] - data[x]['h']['pos'][0][0]))
+            all_pos_pair = []
+            bag = []
+            for i, index in enumerate(pos_scope):
+                bag.append(index)
+                if (i+1) % 2 == 0:
+                    all_pos_pair.append(bag)
+                    bag = []
+            return all_pos_pair
+        else:
+            all_pos_pair = []
+            bag = []
+            for i, index in enumerate(pos_scope):
+                bag.append(index)
+                if (i+1) % 2 == 0:
+                    all_pos_pair.append(bag)
+                    bag = []
+            return all_pos_pair
     
     def __sample__(self):
         """Samples positive pairs.
@@ -563,6 +580,7 @@ class CPDataset(Dataset):
                     ...
                 ]
         """
+        data = json.load(open(os.path.join(self.path, "cpdata.json")))
         rel2scope = json.load(open(os.path.join(self.path, "rel2scope.json")))
         self.pos_pair = []
         for rel in rel2scope.keys():
