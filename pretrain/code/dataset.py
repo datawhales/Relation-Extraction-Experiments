@@ -169,9 +169,9 @@ class TRIPLEDataset(Dataset):
                 random.shuffle(pos_scope)
                 
                 bag = []
-                for i, index in enumerate(pos_scope):
+                for j, index in enumerate(pos_scope):
                     bag.append(index)
-                    if i % 2 == 1:
+                    if j % 2 == 1:
                         neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
                         
                         if neg_rel_index == i:
@@ -185,6 +185,82 @@ class TRIPLEDataset(Dataset):
                         
                         self.triplet.append(bag)
                         bag = []
+        elif self.args.anchor_feature == "percent":
+            self.triplet = []
+            total_list = list(range(len(data)))
+
+            for i, key in enumerate(rel2scope.keys()):
+                scope = rel2scope[key]
+                pos_scope = list(range(scope[0], scope[1]))
+
+                if len(pos_scope) < 10:
+                    continue
+                
+                if self.args.sort_key == "marker_distance_min":
+                    # sort by entity marker distance
+                    pos_scope.sort(key=lambda x: abs(data[x]['t']['pos'][0][0] - data[x]['h']['pos'][0][0]))
+                elif self.args.sort_key == "marker_distance_max":
+                    pos_scope.sort(key=lambda x: -abs(data[x]['t']['pos'][0][0] - data[x]['h']['pos'][0][0]))
+                elif self.args.sort_key == "sentence_length_min":
+                    pos_scope.sort(key=lambda x: len(data[x]['tokens']))
+                elif self.args.sort_key == "sentence_length_max":
+                    pos_scope.sort(key=lambda x: -len(data[x]['tokens']))
+                else:
+                    random.shuffle(pos_scope)
+                
+                # set anchor 10% of each relation
+                gold_anchor_list = pos_scope[:len(pos_scope) // 10]
+                gold_positive_list = pos_scope[len(pos_scope) // 10:]
+                # gold_positive_list = [x for x in gold_positive_list if x in total_list]
+                
+                random.shuffle(gold_anchor_list)
+                random.shuffle(gold_positive_list)
+
+                # first train between gold anchors
+                anchor_num = len(gold_anchor_list) // 2
+
+                bag = []
+                for j, anchor in enumerate(gold_anchor_list):
+                    bag.append(anchor)
+                    if j % 2 == 1:
+                        neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+
+                        while neg_rel_index == i:
+                            neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+                        neg_scopes = rel2scope[rel_key_list[neg_rel_index]]
+                        negative = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+
+                        bag.append(negative)
+
+                        self.triplet.append(bag)
+                        bag = []
+                
+                # next train 90% triplets using trained anchors
+                tmp_anchor_list = gold_anchor_list * (len(gold_positive_list) // len(gold_anchor_list) + 1)
+                random.shuffle(tmp_anchor_list)
+                # train 50% of pairs 
+                positive_list = gold_positive_list[:len(gold_positive_list) // 2]
+                
+                anchor_num = min(len(tmp_anchor_list), len(positive_list))
+
+                anchor_list = random.sample(tmp_anchor_list, anchor_num)
+
+                bag = []
+                for j, anchor in enumerate(anchor_list):
+                    bag.append(anchor)
+                    bag.append(positive_list[j])
+
+                    neg_rel_index = random.sample(random(len(rel2scope)), 1)[0]
+
+                    while neg_rel_index == i:
+                        neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
+                    neg_scopes = rel2scope[rel_key_list[neg_rel_index]]
+                    negative = random.sample(range(neg_scopes[0], neg_scopes[1]), 1)[0]
+
+                    bag.append(negative)
+
+                    self.triplet.append(bag)
+                    bag = []
 
         elif self.args.anchor_feature == "marker_dist":
             self.triplet = []
@@ -195,7 +271,8 @@ class TRIPLEDataset(Dataset):
                 scope = rel2scope[key]
                 pos_scope = list(range(scope[0], scope[1]))
                 # sort by entity marker distance
-                pos_scope.sort(key=lambda x: abs(data[x]['t']['pos'][0][0] - data[x]['h']['pos'][0][0]))
+                # pos_scope.sort(key=lambda x: abs(data[x]['t']['pos'][0][0] - data[x]['h']['pos'][0][0]))
+                random.shuffle(pos_scope)
                 # set anchor 10% of each relation
                 gold_anchor_list = pos_scope[:len(pos_scope) // 10]
                 gold_positive_list = pos_scope[len(pos_scope) // 10:]
@@ -252,10 +329,10 @@ class TRIPLEDataset(Dataset):
                     negative_list = random.sample(left, anchor_num)
                     
                     bag = []
-                    for i, anchor in enumerate(gold_anchor_list):
+                    for j, anchor in enumerate(gold_anchor_list):
                         bag.append(anchor)
-                        if i % 2 == 1:
-                            negative = negative_list[i // 2]
+                        if j % 2 == 1:
+                            negative = negative_list[j // 2]
                             bag.append(negative)              
 
                             if negative in total_list:

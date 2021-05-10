@@ -249,11 +249,12 @@ if __name__ == "__main__":
                         default=7, help="user length used in anchor method")
     parser.add_argument("--anchor_feature", dest="anchor_feature", type=str,
                         default="one", help="use one anchor per relation or random or marker_dist")
-
+    parser.add_argument("--sort_key", dest="sort_key", type=str,
+                        default="random", help="sort key for anchors")
     parser.add_argument("--margin", dest="margin", type=float,
                         default=1.0, help="margin for triplet loss")         
-    parser.add_argument("--teacher_model", dest="teacher_model", type=str,
-                        default="../ckpt/ckpt_exp/end_to_first_concat/ckpt_of_step_60000", help="teacher model path")
+    # parser.add_argument("--teacher_model", dest="teacher_model", type=str,
+    #                     default="../ckpt/ckpt_exp/end_to_first_concat/ckpt_of_step_60000", help="teacher model path")
 
     parser.add_argument("--pooling_method", dest="pooling_method", type=str,
                         default="mean", help="pooling method for entity marker representation after bert {mean, max, min}")
