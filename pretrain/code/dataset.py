@@ -250,7 +250,7 @@ class TRIPLEDataset(Dataset):
                     bag.append(anchor)
                     bag.append(positive_list[j])
 
-                    neg_rel_index = random.sample(random(len(rel2scope)), 1)[0]
+                    neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
 
                     while neg_rel_index == i:
                         neg_rel_index = random.sample(range(len(rel2scope)), 1)[0]
