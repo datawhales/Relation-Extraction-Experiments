@@ -208,9 +208,14 @@ class TRIPLEDataset(Dataset):
                 else:
                     random.shuffle(pos_scope)
                 
-                # set anchor 10% of each relation
-                gold_anchor_list = pos_scope[:len(pos_scope) // 10]
-                gold_positive_list = pos_scope[len(pos_scope) // 10:]
+                if self.args.portion == "10":
+                    # set anchor 10% of each relation
+                    gold_anchor_list = pos_scope[:len(pos_scope) // 10]
+                    gold_positive_list = pos_scope[len(pos_scope) // 10:]
+                elif self.args.portion == "20":
+                    gold_anchor_list = pos_scope[:len(pos_scope) // 5]
+                    gold_positive_list = pos_scope[len(pos_scope) // 5:]
+
                 # gold_positive_list = [x for x in gold_positive_list if x in total_list]
                 
                 random.shuffle(gold_anchor_list)

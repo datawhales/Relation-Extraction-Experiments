@@ -146,9 +146,9 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
             model.training = False
             model.eval()
 
-            if args.dataset == "semeval":
+            if args.dataset == "semeval" or args.dataset == "chemprot" or args.dataset == "kbp37":
                 eval_func = eval_F1
-            elif args.dataset == "wiki80" or args.dataset == "chemprot" or args.dataset == "kbp37":
+            elif args.dataset == "wiki80":
                 eval_func = eval_ACC
             
             score = eval_func(args, model, dev_dataloader)
@@ -162,7 +162,7 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
 
 
     print("@RESULT: " + args.dataset +" Test score is %.3f" % best_test_score)
-    f = open("../log/final_log", 'a+')
+    f = open("../log/new_log", 'a+')
     if args.ckpt_to_load == "None":
         f.write("bert-base\t" + str(args.train_prop) + "\t" + args.dataset + "\t" + str(time.ctime())  +"\n")
     else:
