@@ -48,27 +48,24 @@ class REDataset(torch.utils.data.Dataset):
         self.h_pos = np.zeros(total_instance, dtype=int)
         self.t_pos = np.zeros(total_instance, dtype=int)
         self.label = np.zeros(total_instance, dtype=int)
-        #################### modified ######################
         self.h_end = np.zeros(total_instance, dtype=int)
         self.t_end = np.zeros(total_instance, dtype=int)
-        #################### modified ######################
 
         for i, item in enumerate(data):
-            if args.dataset == "wiki80" or args.dataset == "semeval":
-                self.label[i] = rel2id[item["relation"]]    # i+1 번째 문장의 relation id
-            elif args.dataset == "chemprot":
-                self.label[i] = rel2id[item["label"]]
+            # if args.dataset == "wiki80" or args.dataset == "semeval":
+            #     self.label[i] = rel2id[item["relation"]]    # i+1 번째 문장의 relation id
+            # elif args.dataset == "chemprot":
+            #     self.label[i] = rel2id[item["label"]]
+            self.label[i] = rel2id[item['relation']]
+
             # tokenize
             if args.mode == "CM":
-        #################### modified ######################
                 ids, ph, pt, eh, et = entityMarker.tokenize(raw_text=item["token"], h_pos_range=item['h']['pos'], t_pos_range=item['t']['pos'])
-        #################### modified ######################
+
             elif args.mode == "CT":
                 h_type = f"[unused{type2id['subj_'+item['h']['type']] + 10}]"
                 t_type = f"[unused{type2id['obj_'+item['t']['type']] + 10}]"
-        #################### modified ######################
                 ids, ph, pt, eh, et = entityMarker.tokenize(item["token"], item['h']['pos'], item['t']['pos'], h_type, t_type)
-        #################### modified ######################
             else:
                 raise Exception("No such mode! Please make sure that 'mode' takes the value in {CM, CT}")
 
@@ -77,10 +74,8 @@ class REDataset(torch.utils.data.Dataset):
             self.mask[i][0:length] = 1
             self.h_pos[i] = min(ph, args.max_length - 1)
             self.t_pos[i] = min(pt, args.max_length - 1)
-        #################### modified ######################
             self.h_end[i] = min(eh, args.max_length - 1)
             self.t_end[i] = min(et, args.max_length - 1)
-        #################### modified ######################
         print(f"The number of sentence in which tokenizer can't find head/tail entity is {entityMarker.err}")
 
     def __len__(self):

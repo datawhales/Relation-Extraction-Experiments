@@ -16,7 +16,6 @@ class REModel(nn.Module):
             print("CrossEntropy Loss has weight!")
             self.loss = nn.CrossEntropyLoss(weight=weight)
 
-        #################### modified ######################
         # scale = 2 if args.output_representation == "entity_marker" else 1
         ## all_markers_concat -> scale 4
         ## entity_marker, end_to_first_concat -> scale 2
@@ -27,7 +26,7 @@ class REModel(nn.Module):
             scale = 2
         else:
             scale = 1
-        #################### modified ######################
+
         self.rel_fc = nn.Linear(args.hidden_size * scale, args.rel_num)
         self.bert = BertModel.from_pretrained('bert-base-uncased')
 
@@ -41,10 +40,8 @@ class REModel(nn.Module):
             self.bert.load_state_dict(model_dict)
         else:
             print("******** No ckpt to load, we will use bert base! ********")
-        #################### modified ######################
-    def forward(self, input_ids, mask, h_pos, t_pos, label, h_end, t_end):
-        #################### modified ######################
 
+    def forward(self, input_ids, mask, h_pos, t_pos, label, h_end, t_end):
         # bert encode
         outputs = self.bert(input_ids, mask)
 

@@ -110,10 +110,8 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
                 "h_pos":batch[2],
                 "t_pos":batch[3],
                 "label":batch[4],
-        #################### modified ######################
                 "h_end":batch[5],
                 "t_end":batch[6]
-        #################### modified ######################
             }
             model.training = True
             model.train()
@@ -204,10 +202,8 @@ def eval_ACC(args, model, dataloader):
             "h_pos":batch[2],
             "t_pos":batch[3],
             "label":batch[4],
-        #################### modified ######################
             "h_end":batch[5],
             "t_end":batch[6]
-        #################### modified ######################
         }
         _, output = model(**inputs)
         output = output.cpu().detach().numpy()
@@ -226,7 +222,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size_per_gpu", dest="batch_size_per_gpu", type=int, 
                         default=0, help="batch size pre gpu")
     parser.add_argument("--dataset", dest="dataset", type=str,
-                        default='tacred',help='dataset to use')
+                        default='wiki80',help='dataset to use')
     parser.add_argument("--lr", dest="lr", type=float,
                         default=3e-5, help='learning rate')
     parser.add_argument("--hidden_size", dest="hidden_size", type=int,
@@ -249,9 +245,7 @@ if __name__ == "__main__":
                         default=64, help="max sentence length")
     parser.add_argument("--ckpt_to_load", dest="ckpt_to_load", type=str,
                         default="None", help="ckpt to load")
-    # parser.add_argument("--entity_marker", action='store_true', 
-    #                     help="if entity marker or cls")
-    # revised
+
     parser.add_argument("--output_representation", dest="output_representation", type=str,
                         default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat, marker_minus}")
     
@@ -288,18 +282,34 @@ if __name__ == "__main__":
     if not os.path.exists("../log"):
         os.mkdir("../log")
     
-    # params for dataloader
-    if args.train_prop == 1:
-        print("Use all train data!")
-        train_set = REDataset("../data/"+args.dataset, "train.txt", args)
-    elif args.train_prop == 0.1:
-        print("Use 10% train data!")
-        train_set = REDataset("../data/"+args.dataset, "train_0.1.txt", args)
-    elif args.train_prop == 0.01:
-        print("Use 1% train data!")
-        train_set = REDataset("../data/"+args.dataset, "train_0.01.txt", args)
-    dev_set = REDataset("../data/"+args.dataset, "dev.txt", args)
-    test_set = REDataset("../data/"+args.dataset, "test.txt", args)
+    if args.dataset == "wiki80":
+        # params for dataloader
+        if args.train_prop == 1:
+            print("Use all train data!")
+            train_set = REDataset("../data/"+args.dataset, "train.txt", args)
+        elif args.train_prop == 0.1:
+            print("Use 10% train data!")
+            train_set = REDataset("../data/"+args.dataset, "train_0.1.txt", args)
+        elif args.train_prop == 0.01:
+            print("Use 1% train data!")
+            train_set = REDataset("../data/"+args.dataset, "train_0.01.txt", args)
+        dev_set = REDataset("../data/"+args.dataset, "dev.txt", args)
+        test_set = REDataset("../data/"+args.dataset, "test.txt", args)
+    
+    else:
+         # params for dataloader
+        if args.train_prop == 1:
+            print("Use all train data!")
+            train_set = REDataset("../data/"+args.dataset, "new_train.txt", args)
+        elif args.train_prop == 0.1:
+            print("Use 10% train data!")
+            train_set = REDataset("../data/"+args.dataset, "new_train_0.1.txt", args)
+        elif args.train_prop == 0.01:
+            print("Use 1% train data!")
+            train_set = REDataset("../data/"+args.dataset, "new_train_0.01.txt", args)
+
+        dev_set = REDataset("../data/"+args.dataset, "new_dev.txt", args)
+        test_set = REDataset("../data/"+args.dataset, "new_test.txt", args)
 
     train_dataloader = data.DataLoader(train_set, batch_size=args.batch_size_per_gpu, shuffle=True)        
     dev_dataloader = data.DataLoader(dev_set, batch_size=args.batch_size_per_gpu, shuffle=False)
