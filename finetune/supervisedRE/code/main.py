@@ -146,9 +146,9 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
             model.training = False
             model.eval()
 
-            if args.dataset == "semeval" or args.dataset == "tacred":
+            if args.dataset == "semeval":
                 eval_func = eval_F1
-            elif args.dataset == "wiki80" or args.dataset == "chemprot":
+            elif args.dataset == "wiki80" or args.dataset == "chemprot" or args.dataset == "kbp37":
                 eval_func = eval_ACC
             
             score = eval_func(args, model, dev_dataloader)
@@ -164,9 +164,9 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
     print("@RESULT: " + args.dataset +" Test score is %.3f" % best_test_score)
     f = open("../log/final_log", 'a+')
     if args.ckpt_to_load == "None":
-        f.write("bert-base\t" + args.train_prop + "\t" + args.dataset + "\t" + str(time.ctime())  +"\n")
+        f.write("bert-base\t" + str(args.train_prop) + "\t" + args.dataset + "\t" + str(time.ctime())  +"\n")
     else:
-        f.write(args.ckpt_to_load + "\t" + args.train_prop + "\t" + args.dataset + "\t" +str(time.ctime()) +"\n")
+        f.write(args.ckpt_to_load + "\t" + str(args.train_prop) + "\t" + args.dataset + "\t" +str(time.ctime()) +"\n")
     f.write("@RESULT: Best Dev score is %.3f, Test score is %.3f\n" % (best_dev_score, best_test_score))
     f.write("--------------------------------------------------------------\n")
     f.close()
@@ -321,4 +321,5 @@ if __name__ == "__main__":
     model = REModel(args)
     model.cuda()
     train(args, model, train_dataloader, dev_dataloader, test_dataloader)
+    
     
