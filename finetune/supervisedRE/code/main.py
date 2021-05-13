@@ -125,7 +125,7 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
             # else:
             #     loss.backward()
 
-            loss.sum().backward()
+            loss.backward()
 
             optimizer.step()
             if args.optim == "adamw":
@@ -138,7 +138,7 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
             crr = (output == label).sum()
             tot = label.shape[0]
 
-            sys.stdout.write("epoch: %d, loss: %.6f, acc: %.3f\r" % (i, loss.sum(), crr/tot))
+            sys.stdout.write("epoch: %d, loss: %.6f, acc: %.3f\r" % (i, loss, crr/tot))
             sys.stdout.flush()
 
         # dev
@@ -164,11 +164,11 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
 
 
     print("@RESULT: " + args.dataset +" Test score is %.3f" % best_test_score)
-    f = open("../log/re_log", 'a+')
+    f = open("../log/final_log", 'a+')
     if args.ckpt_to_load == "None":
-        f.write("bert-base\t" + args.dataset + "\t" + str(time.ctime())  +"\n")
+        f.write("bert-base\t" + args.train_prop + "\t" + args.dataset + "\t" + str(time.ctime())  +"\n")
     else:
-        f.write(args.ckpt_to_load + "\t" + args.dataset + "\t" +str(time.ctime()) +"\n")
+        f.write(args.ckpt_to_load + "\t" + args.train_prop + "\t" + args.dataset + "\t" +str(time.ctime()) +"\n")
     f.write("@RESULT: Best Dev score is %.3f, Test score is %.3f\n" % (best_dev_score, best_test_score))
     f.write("--------------------------------------------------------------\n")
     f.close()
@@ -184,10 +184,8 @@ def eval_F1(args, model, dataloader):
             "h_pos":batch[2],
             "t_pos":batch[3],
             "label":batch[4],
-        #################### modified ######################
             "h_end":batch[5],
             "t_end":batch[6]
-        #################### modified ######################
         }
         _, output = model(**inputs)
         tot_label.extend(batch[4].tolist())
