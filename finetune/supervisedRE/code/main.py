@@ -162,7 +162,7 @@ def train(args, model, train_dataloader, dev_dataloader, test_dataloader, devBag
 
 
     print("@RESULT: " + args.dataset +" Test score is %.3f" % best_test_score)
-    f = open("../log/new_log", 'a+')
+    f = open("../log/" + args.log_name, 'a+')
     if args.ckpt_to_load == "None":
         f.write("bert-base\t" + str(args.train_prop) + "\t" + args.dataset + "\t" + str(time.ctime())  +"\n")
     else:
@@ -245,7 +245,8 @@ if __name__ == "__main__":
                         default=64, help="max sentence length")
     parser.add_argument("--ckpt_to_load", dest="ckpt_to_load", type=str,
                         default="None", help="ckpt to load")
-
+    parser.add_argument("--log_name", dest="log_name", type=str,
+                        default="final_log", help="log file name")
     parser.add_argument("--output_representation", dest="output_representation", type=str,
                         default="entity_marker", help="output representation {CLS, entity marker, all_markers, all_markers_concat, end_to_first, end_to_first_concat, marker_minus}")
     
