@@ -8,9 +8,9 @@ Knowledge Graph는 많은 AI task(semantic search, question answering, recommend
 
 이러한 비용적인 측면의 비효율성 때문에 최근에는 NLP를 이용해 Knowledge Graph를 기계적으로 구축하려는 많은 연구가 이루어지고 있습니다.
 
-이 프로젝트에서는 기계적인 Knowledge Graph Construction의 핵심이라 할 수 있는 Relation Extraction Task와 관련된 연구를 하고자 합니다.
+이 프로젝트에서는 기계적인 Knowledge Graph Construction의 핵심이라 할 수 있는 **Relation Extraction Task**와 관련된 연구를 하고자 합니다.
 
-좀 더 구체적으로는 Relation Extraction Task의 성능 개선과 성능에 영향을 미치는 요인에 대해 연구하는 것이 목적입니다.
+좀 더 구체적으로는 **BERT**를 이용해 Relation Extraction Task의 성능 개선과 성능에 영향을 미치는 요인에 대해 연구하는 것이 목적입니다.
 
 ## Ideas
 - BERT 통과 후 representation vector 변형하여 학습
